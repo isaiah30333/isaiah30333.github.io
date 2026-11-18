@@ -3,7 +3,8 @@
   "tickers": [
     { "symbol": "SPY",   "tv": "AMEX:SPY",     "name": "SPDR S&P 500 ETF",        "pin": true },
     { "symbol": "QQQ",   "tv": "NASDAQ:QQQ",   "name": "Invesco QQQ (Nasdaq-100)", "pin": true },
-    { "symbol": "NVDA",  "tv": "NASDAQ:NVDA",  "name": "NVIDIA" },
+    { "symbol": "NVDA",  "tv": "NASDAQ:NVDA",  "name": "NVIDIA", "pin": true },
+    { "symbol": "AMD",   "tv": "NASDAQ:AMD",   "name": "Advanced Micro Devices", "pin": true },
     { "symbol": "AAPL",  "tv": "NASDAQ:AAPL",  "name": "Apple" },
     { "symbol": "MSFT",  "tv": "NASDAQ:MSFT",  "name": "Microsoft" },
     { "symbol": "AMZN",  "tv": "NASDAQ:AMZN",  "name": "Amazon" },

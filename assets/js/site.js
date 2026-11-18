@@ -153,9 +153,19 @@
       items.forEach(function (i) { i.classList.add("in"); });
       return;
     }
+    // After an element has faded in, mark it "done" so hover effects use quick transitions
+    // instead of the slow, delayed reveal transition.
+    function finish(el) { el.classList.add("done"); }
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) {
-        if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+        if (!e.isIntersecting) return;
+        var el = e.target;
+        el.classList.add("in");
+        io.unobserve(el);
+        el.addEventListener("transitionend", function onEnd(ev) {
+          if (ev.target === el && ev.propertyName === "opacity") { el.removeEventListener("transitionend", onEnd); finish(el); }
+        });
+        setTimeout(function () { finish(el); }, 1500); // fallback
       });
     }, { rootMargin: "0px 0px -8% 0px" });
     items.forEach(function (i) { io.observe(i); });

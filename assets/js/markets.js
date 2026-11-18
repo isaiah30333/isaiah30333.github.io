@@ -154,6 +154,7 @@
   /* ---------- live paint: update cells in place (keeps hover/focus) ---------- */
   var lastShown = {};
   function paintLive() {
+    liveBar(state.symbol);
     rowsFor(state.tf).forEach(function (r) {
       if (r.err) return;
       var prev = lastShown[r.symbol];
@@ -242,7 +243,9 @@
       m.data.forEach(function (tr) {
         var sym = fhToSym[tr.s];
         if (!sym || !(tr.p > 0)) return;
-        (live[sym] || (live[sym] = {})).price = tr.p;
+        var L = live[sym] || (live[sym] = {});
+        L.price = tr.p;
+        L.ts = tr.t;   // trade time (ms) → which candle it belongs to
       });
       if (feed !== "live") setFeed("live");
       schedulePaint();
@@ -266,23 +269,135 @@
     host.firstChild.appendChild(s);
   }
 
-  var chartKey = "";
-  function renderChart() {
-    var t = tickers().filter(function (x) { return x.symbol === state.symbol; })[0];
-    if (!t) return;
-    var theme = isDark() ? "dark" : "light";
-    var key = t.tv + "|" + theme;
-    if (key === chartKey) return;
-    chartKey = key;
-    document.getElementById("chart-sym").textContent = t.symbol;
-    document.getElementById("chart-name").textContent = t.name || "";
-    tvEmbed(document.getElementById("tv-chart"), "embed-widget-advanced-chart.js", {
+  /* ---------- chart: candles + expected-move lines (Lightweight Charts) ----------
+     Falls back to the TradingView widget if the library or the bar data is missing. */
+  var LW = window.LightweightCharts;
+  var chart = null, candles = null, emLines = [], em = { lo: null, hi: null };
+  var lastBar = null, barSecs = 300, chartMode = "", chartKey = "";
+
+  function cssVar(n) { return getComputedStyle(root).getPropertyValue(n).trim(); }
+
+  // New York wall-clock time encoded as UTC seconds (same encoding as the data file's bars)
+  var etFmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  });
+  function etSeconds(ms) {
+    var p = {};
+    etFmt.formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return Date.UTC(+p.year, +p.month - 1, +p.day, (+p.hour) % 24, +p.minute, +p.second) / 1000;
+  }
+
+  function chartTheme() {
+    return {
+      layout: {
+        background: { type: "solid", color: cssVar("--surface") },
+        textColor: cssVar("--text-muted"),
+        fontFamily: cssVar("--font-body") || "Inter, system-ui, sans-serif"
+      },
+      grid: { vertLines: { color: cssVar("--border") }, horzLines: { color: cssVar("--border") } },
+      rightPriceScale: { borderColor: cssVar("--border") },
+      timeScale: { borderColor: cssVar("--border"), timeVisible: true, secondsVisible: false }
+    };
+  }
+
+  function dropLW() {
+    if (chart) chart.remove();
+    chart = candles = null; emLines = []; lastBar = null;
+  }
+
+  function ensureLW(host) {
+    if (chartMode === "lw" && chart) return;
+    host.innerHTML = "";
+    chart = LW.createChart(host, Object.assign({ autoSize: true, crosshair: { mode: LW.CrosshairMode.Normal } }, chartTheme()));
+    candles = chart.addCandlestickSeries({
+      borderVisible: false,
+      // keep the expected-move lines on screen even when price hasn't reached them
+      autoscaleInfoProvider: function (orig) {
+        var r = orig();
+        if (r && r.priceRange && em.lo != null) {
+          r.priceRange.minValue = Math.min(r.priceRange.minValue, em.lo);
+          r.priceRange.maxValue = Math.max(r.priceRange.maxValue, em.hi);
+        }
+        return r;
+      }
+    });
+    chartMode = "lw";
+  }
+
+  function renderTVChart(host, t, theme) {
+    dropLW();
+    chartMode = "tv";
+    tvEmbed(host, "embed-widget-advanced-chart.js", {
       autosize: true, symbol: t.tv, interval: "D", timezone: "America/New_York",
       theme: theme, style: "1", locale: "en",
       backgroundColor: theme === "dark" ? "rgba(20,20,24,1)" : "rgba(255,255,255,1)",
       hide_side_toolbar: true, allow_symbol_change: true, calendar: false,
       support_host: "https://www.tradingview.com"
     });
+  }
+
+  function renderChart() {
+    var t = tickers().filter(function (x) { return x.symbol === state.symbol; })[0];
+    if (!t) return;
+    var theme = isDark() ? "dark" : "light";
+    var key = [t.symbol, state.tf, theme, state.data.generatedAt].join("|");
+    if (key === chartKey) return;
+    chartKey = key;
+
+    var b = t[state.tf] || {};
+    var daily = state.tf === "daily";
+    document.getElementById("chart-sym").textContent = t.symbol;
+    document.getElementById("chart-name").textContent = t.name || "";
+    document.getElementById("chart-tv").href = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(t.tv);
+    document.getElementById("chart-em").innerHTML = b.move != null
+      ? '<span class="muted">' + (daily ? "Daily" : "Weekly") + " EM</span> ±" + money(b.move) +
+        ' <span class="muted">(' + pct(b.movePct) + ')</span> · <span class="down">' + money(b.low) +
+        '</span> – <span class="up">' + money(b.high) + "</span>"
+      : "";
+
+    var host = document.getElementById("tv-chart");
+    var bars = t.bars && t.bars[daily ? "d" : "w"];
+    if (!LW || !bars || !bars.length) { renderTVChart(host, t, theme); return; }
+
+    ensureLW(host);
+    chart.applyOptions(chartTheme());
+    var up = cssVar("--up"), down = cssVar("--down");
+    candles.applyOptions({ upColor: up, downColor: down, wickUpColor: up, wickDownColor: down });
+
+    barSecs = daily ? 300 : 1800;
+    var data = bars.map(function (r) { return { time: r[0], open: r[1], high: r[2], low: r[3], close: r[4] }; });
+    emLines.forEach(function (l) { candles.removePriceLine(l); });
+    emLines = [];
+    em.lo = b.high != null ? b.low : null;
+    em.hi = b.high != null ? b.high : null;
+    candles.setData(data);
+    lastBar = Object.assign({}, data[data.length - 1]);
+
+    if (b.high != null) {
+      emLines.push(candles.createPriceLine({ price: b.high, color: up, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: "EM high" }));
+      emLines.push(candles.createPriceLine({ price: b.low, color: down, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: "EM low" }));
+      emLines.push(candles.createPriceLine({
+        price: b.anchor != null ? b.anchor : t.price, color: cssVar("--text-faint"),
+        lineWidth: 1, lineStyle: LW.LineStyle.Dotted, axisLabelVisible: true, title: "center"
+      }));
+    }
+    chart.timeScale().fitContent();
+  }
+
+  // Extend the chart's last candle with live trades for the selected symbol.
+  function liveBar(sym) {
+    var L = live[sym];
+    if (chartMode !== "lw" || !candles || !lastBar || sym !== state.symbol || !L || !L.ts || !marketOpen()) return;
+    var t = Math.floor(etSeconds(L.ts) / barSecs) * barSecs;
+    if (t < lastBar.time) return;
+    if (t > lastBar.time) lastBar = { time: t, open: L.price, high: L.price, low: L.price, close: L.price };
+    else {
+      lastBar.high = Math.max(lastBar.high, L.price);
+      lastBar.low = Math.min(lastBar.low, L.price);
+      lastBar.close = L.price;
+    }
+    candles.update(Object.assign({}, lastBar));
   }
 
   var tapeKey = "";
@@ -316,6 +431,7 @@
       });
       try { localStorage.setItem("em-tf", state.tf); } catch (e) {}
       render();
+      renderChart();   // daily ↔ weekly swaps the candles and the expected-move lines
     });
   });
 
@@ -379,6 +495,7 @@
           state.data = nd;
           renderMeta();
           render();
+          renderChart();
         }
       });
     }, 5 * 60000);

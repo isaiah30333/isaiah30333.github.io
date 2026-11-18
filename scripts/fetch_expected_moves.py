@@ -22,6 +22,7 @@ Run locally:  pip install -r scripts/requirements.txt
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 import json
 import math
@@ -127,6 +128,26 @@ def move_block(anchor: float, iv: float, years: float, days: int, expiry: str, *
     }
 
 
+def fetch_bars(tk: yf.Ticker, interval: str, sessions: int) -> list:
+    """Recent candles as [time, open, high, low, close].
+    `time` is New York wall-clock time encoded as UTC seconds, so the chart's
+    time axis reads in ET without any timezone handling in the browser."""
+    h = tk.history(period="5d", interval=interval, prepost=False, auto_adjust=False)
+    if h is None or h.empty:
+        return []
+    idx = h.index.tz_localize("UTC") if h.index.tz is None else h.index
+    idx = idx.tz_convert(ET)
+    keep = set(sorted({ts.date() for ts in idx})[-sessions:])
+    rows = []
+    for ts, (o, hi, lo, c) in zip(idx, h[["Open", "High", "Low", "Close"]].itertuples(index=False, name=None)):
+        if ts.date() not in keep or any(v != v for v in (o, hi, lo, c)):  # v != v → NaN
+            continue
+        nd = 4 if c < 5 else 2
+        t = calendar.timegm(ts.replace(tzinfo=None).timetuple())
+        rows.append([t, round(o, nd), round(hi, nd), round(lo, nd), round(c, nd)])
+    return rows
+
+
 def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     today = now.date()
     sym = item["symbol"]
@@ -176,6 +197,13 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
         straddle=round(w_straddle, 4 if price < 5 else 2) if w_straddle else None,
         isWeekly=bool(in_week),
     )
+
+    # Candles for the chart: daily view = 5-min bars of the latest session,
+    # weekly view = 30-min bars of the last 5 sessions. Optional: chart falls back if missing.
+    try:
+        out["bars"] = {"d": fetch_bars(tk, "5m", 1), "w": fetch_bars(tk, "30m", 5)}
+    except Exception as e:
+        print(f"     {sym}: no bars ({e})", file=sys.stderr)
     return out
 
 
