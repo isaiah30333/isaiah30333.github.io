@@ -24,8 +24,8 @@ window.SITE = {
 
   /* ---- Look & feel ---- */
   theme: {
-    accent: "#1E3A5F",          // main brand color (buttons, links, highlights): navy
-    accentDark: "#9DB7DA",      // accent used in dark mode: steel blue
+    accent: "#8A6A1F",          // main brand color (buttons, links, highlights): bronze
+    accentDark: "#E0C27A",      // accent used in dark mode: light gold
     radius: "12px",             // corner roundness: "4px" sharp … "20px" soft
     defaultMode: "system"       // "system" | "light" | "dark"
   },

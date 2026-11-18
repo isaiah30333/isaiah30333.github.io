@@ -3,7 +3,8 @@
   var S = window.SITE || {};
   var esc = window.SiteUtil.esc;
   var root = document.documentElement;
-  var state = { tf: "daily", sort: null, dir: 1, data: null, symbol: null };
+  // tf = expected-move horizon (daily | weekly | monthly); iv = chart candle interval
+  var state = { tf: "daily", iv: "15m", sort: null, dir: 1, data: null, symbol: null };
   var live = {};          // yahoo symbol -> { price, pc }
   var fhToSym = {};       // finnhub symbol -> yahoo symbol
   var feed = "off";       // off | connecting | live | closed | error
@@ -103,7 +104,7 @@
   function renderPinned(rows) {
     document.getElementById("em-pinned").innerHTML = rows.filter(function (r) { return r.t.pin && !r.err; }).map(function (r) {
       var label = state.tf === "daily" ? "Daily expected move"
-        : "Weekly expected move · " + r.days + " trading day" + (r.days === 1 ? "" : "s");
+        : (state.tf === "weekly" ? "Weekly" : "Monthly") + " expected move · " + r.days + " trading day" + (r.days === 1 ? "" : "s");
       return '<button class="card pin-card hover" data-sym="' + esc(r.symbol) + '">' +
         '<div class="pin-top"><div><span class="pin-sym">' + esc(r.symbol) + '</span><span class="muted small">' + esc(r.t.name) + "</span></div>" +
           '<div class="pin-price mono"><span data-k="price">' + money(r.price) + '</span> <span data-k="chg">' + chgHtml(r.changePct) + "</span></div></div>" +
@@ -281,14 +282,30 @@
   }
 
   /* ---------- chart: candles + expected-move lines (Lightweight Charts) ----------
-     Falls back to the TradingView widget if the library or the bar data is missing. */
+     Candles come from data/bars/<SYMBOL>.json (built by the GitHub Action), one file per
+     ticker, fetched when that ticker is charted. 3m and 4h candles are built here from 1m / 1h.
+     Falls back to the TradingView widget if the library or the candle file is missing. */
   var LW = window.LightweightCharts;
   var chart = null, candles = null, emLines = [], em = { lo: null, hi: null };
-  var lastBar = null, barSecs = 300, chartMode = "", chartKey = "";
+  var lastBar = null, chartMode = "", chartKey = "", chartReq = 0, barCache = {};
+
+  // interval key -> source candles in the data file, bucket rule, how many candles to show at first
+  var IV = {
+    "1m":  { src: "1m",  secs: 60,    show: 300 },
+    "3m":  { src: "1m",  secs: 180,   show: 180, agg: true },
+    "5m":  { src: "5m",  secs: 300,   show: 180 },
+    "15m": { src: "15m", secs: 900,   show: 140 },
+    "1h":  { src: "1h",  secs: 3600,  show: 140 },
+    "4h":  { src: "1h",  secs: 14400, show: 100, agg: true, session: true },
+    "1D":  { src: "1d",  day: true,   show: 130 },
+    "1W":  { src: "1w",  week: true,  show: 104 }
+  };
+  var TV_IV = { "1m": "1", "3m": "3", "5m": "5", "15m": "15", "1h": "60", "4h": "240", "1D": "D", "1W": "W" };
+  var HORIZON = { daily: "Day", weekly: "Week", monthly: "Month" };
 
   function cssVar(n) { return getComputedStyle(root).getPropertyValue(n).trim(); }
 
-  // New York wall-clock time encoded as UTC seconds (same encoding as the data file's bars)
+  // New York wall-clock time encoded as UTC seconds (same encoding as the candle files)
   var etFmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
@@ -299,7 +316,45 @@
     return Date.UTC(+p.year, +p.month - 1, +p.day, (+p.hour) % 24, +p.minute, +p.second) / 1000;
   }
 
-  function chartTheme() {
+  // start time of the candle that time t (ET seconds) belongs to, for interval `key`
+  function bucketStart(t, key) {
+    var c = IV[key], day = Math.floor(t / 86400) * 86400;
+    if (c.day) return day;
+    if (c.week) return day - ((new Date(day * 1000).getUTCDay() + 6) % 7) * 86400;   // back to Monday
+    if (c.session) {                                                                 // 4h candles start 9:30, 13:30
+      var open = day + 570 * 60;
+      return open + Math.max(0, Math.floor((t - open) / c.secs)) * c.secs;
+    }
+    return Math.floor(t / c.secs) * c.secs;
+  }
+
+  function toCandles(rows, key) {
+    var agg = IV[key].agg, out = [], cur = null;
+    rows.forEach(function (r) {
+      var t = agg ? bucketStart(r[0], key) : r[0];
+      if (cur && cur.time === t) {
+        cur.high = Math.max(cur.high, r[2]);
+        cur.low = Math.min(cur.low, r[3]);
+        cur.close = r[4];
+      } else {
+        cur = { time: t, open: r[1], high: r[2], low: r[3], close: r[4] };
+        out.push(cur);
+      }
+    });
+    return out;
+  }
+
+  function loadBars(sym) {
+    if (sym in barCache) return Promise.resolve(barCache[sym]);
+    if (location.protocol.indexOf("http") !== 0) return Promise.resolve(null);   // opened from disk: no fetch
+    var bust = Math.floor(Date.now() / 300000);                                   // refresh at most every 5 min
+    return fetch("data/bars/" + encodeURIComponent(sym) + ".json?t=" + bust)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (d) { barCache[sym] = d && d.bars ? d.bars : null; return barCache[sym]; });
+  }
+
+  function chartTheme(intraday) {
     return {
       layout: {
         background: { type: "solid", color: cssVar("--surface") },
@@ -308,7 +363,7 @@
       },
       grid: { vertLines: { color: cssVar("--border") }, horzLines: { color: cssVar("--border") } },
       rightPriceScale: { borderColor: cssVar("--border") },
-      timeScale: { borderColor: cssVar("--border"), timeVisible: true, secondsVisible: false }
+      timeScale: { borderColor: cssVar("--border"), timeVisible: intraday, secondsVisible: false }
     };
   }
 
@@ -320,7 +375,7 @@
   function ensureLW(host) {
     if (chartMode === "lw" && chart) return;
     host.innerHTML = "";
-    chart = LW.createChart(host, Object.assign({ autoSize: true, crosshair: { mode: LW.CrosshairMode.Normal } }, chartTheme()));
+    chart = LW.createChart(host, Object.assign({ autoSize: true, crosshair: { mode: LW.CrosshairMode.Normal } }, chartTheme(true)));
     candles = chart.addCandlestickSeries({
       borderVisible: false,
       // keep the expected-move lines on screen even when price hasn't reached them
@@ -340,9 +395,9 @@
     dropLW();
     chartMode = "tv";
     tvEmbed(host, "embed-widget-advanced-chart.js", {
-      autosize: true, symbol: t.tv, interval: "D", timezone: "America/New_York",
+      autosize: true, symbol: t.tv, interval: TV_IV[state.iv] || "D", timezone: "America/New_York",
       theme: theme, style: "1", locale: "en",
-      backgroundColor: theme === "dark" ? "rgba(20,20,24,1)" : "rgba(255,255,255,1)",
+      backgroundColor: theme === "dark" ? "rgba(22,21,17,1)" : "rgba(255,255,255,1)",
       hide_side_toolbar: true, allow_symbol_change: true, calendar: false,
       support_host: "https://www.tradingview.com"
     });
@@ -352,32 +407,39 @@
     var t = tickers().filter(function (x) { return x.symbol === state.symbol; })[0];
     if (!t) return;
     var theme = isDark() ? "dark" : "light";
-    var key = [t.symbol, state.tf, theme, state.data.generatedAt].join("|");
+    var key = [t.symbol, state.tf, state.iv, theme, state.data.generatedAt].join("|");
     if (key === chartKey) return;
     chartKey = key;
 
     var b = t[state.tf] || {};
-    var daily = state.tf === "daily";
+    var label = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" }[state.tf];
     document.getElementById("chart-sym").textContent = t.symbol;
     document.getElementById("chart-name").textContent = t.name || "";
     document.getElementById("chart-tv").href = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(t.tv);
     document.getElementById("chart-em").innerHTML = b.move != null
-      ? '<span class="muted">' + (daily ? "Daily" : "Weekly") + " EM</span> ±" + money(b.move) +
+      ? '<span class="muted">' + label + " EM</span> ±" + money(b.move) +
         ' <span class="muted">(' + pct(b.movePct) + ')</span> · <span class="down">' + money(b.low) +
-        '</span> – <span class="up">' + money(b.high) + "</span>"
+        '</span> – <span class="up">' + money(b.high) + '</span> <span class="muted">· exp ' + esc(fmtDate(b.expiry)) + "</span>"
       : "";
 
+    var my = ++chartReq;
+    loadBars(t.symbol).then(function (bars) {
+      if (my !== chartReq) return;   // the user already picked something else
+      drawChart(t, b, bars && bars[IV[state.iv].src], theme);
+    });
+  }
+
+  function drawChart(t, b, rows, theme) {
     var host = document.getElementById("tv-chart");
-    var bars = t.bars && t.bars[daily ? "d" : "w"];
-    if (!LW || !bars || !bars.length) { renderTVChart(host, t, theme); return; }
+    if (!LW || !rows || !rows.length) { renderTVChart(host, t, theme); return; }
 
     ensureLW(host);
-    chart.applyOptions(chartTheme());
+    var c = IV[state.iv];
+    chart.applyOptions(chartTheme(!c.day && !c.week));
     var up = cssVar("--up"), down = cssVar("--down");
     candles.applyOptions({ upColor: up, downColor: down, wickUpColor: up, wickDownColor: down });
 
-    barSecs = daily ? 300 : 1800;
-    var data = bars.map(function (r) { return { time: r[0], open: r[1], high: r[2], low: r[3], close: r[4] }; });
+    var data = toCandles(rows, state.iv);
     emLines.forEach(function (l) { candles.removePriceLine(l); });
     emLines = [];
     em.lo = b.high != null ? b.low : null;
@@ -386,21 +448,23 @@
     lastBar = Object.assign({}, data[data.length - 1]);
 
     if (b.high != null) {
-      emLines.push(candles.createPriceLine({ price: b.high, color: up, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: "EM high" }));
-      emLines.push(candles.createPriceLine({ price: b.low, color: down, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: "EM low" }));
+      var h = HORIZON[state.tf];
+      emLines.push(candles.createPriceLine({ price: b.high, color: up, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: h + " EM high" }));
+      emLines.push(candles.createPriceLine({ price: b.low, color: down, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: h + " EM low" }));
       emLines.push(candles.createPriceLine({
         price: b.anchor != null ? b.anchor : t.price, color: cssVar("--text-faint"),
         lineWidth: 1, lineStyle: LW.LineStyle.Dotted, axisLabelVisible: true, title: "center"
       }));
     }
-    chart.timeScale().fitContent();
+    if (data.length > c.show) chart.timeScale().setVisibleLogicalRange({ from: data.length - c.show, to: data.length + 2 });
+    else chart.timeScale().fitContent();
   }
 
   // Extend the chart's last candle with live trades for the selected symbol.
   function liveBar(sym) {
     var L = live[sym];
     if (chartMode !== "lw" || !candles || !lastBar || sym !== state.symbol || !L || !L.ts || !marketOpen()) return;
-    var t = Math.floor(etSeconds(L.ts) / barSecs) * barSecs;
+    var t = bucketStart(etSeconds(L.ts), state.iv);
     if (t < lastBar.time) return;
     if (t > lastBar.time) lastBar = { time: t, open: L.price, high: L.price, low: L.price, close: L.price };
     else {
@@ -434,15 +498,31 @@
   }
 
   /* ---------- events ---------- */
-  document.querySelectorAll(".seg button").forEach(function (b) {
+  // expected-move horizon: Daily / Weekly / Monthly (table, cards and chart lines)
+  document.querySelectorAll("#tf-seg button").forEach(function (b) {
     b.addEventListener("click", function () {
       state.tf = b.getAttribute("data-tf");
-      document.querySelectorAll(".seg button").forEach(function (x) {
+      document.querySelectorAll("#tf-seg button").forEach(function (x) {
         x.setAttribute("aria-selected", x === b ? "true" : "false");
       });
       try { localStorage.setItem("em-tf", state.tf); } catch (e) {}
       render();
-      renderChart();   // daily ↔ weekly swaps the candles and the expected-move lines
+      renderChart();   // swaps the expected-move lines on the chart
+    });
+  });
+
+  // candle interval: 1m … 1W (chart only)
+  function markIv() {
+    document.querySelectorAll("#iv-seg button").forEach(function (x) {
+      x.setAttribute("aria-pressed", x.getAttribute("data-iv") === state.iv ? "true" : "false");
+    });
+  }
+  document.querySelectorAll("#iv-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.iv = b.getAttribute("data-iv");
+      markIv();
+      try { localStorage.setItem("em-iv", state.iv); } catch (e) {}
+      renderChart();
     });
   });
 
@@ -472,11 +552,14 @@
   /* ---------- boot ---------- */
   try {
     var saved = localStorage.getItem("em-tf");
-    if (saved === "daily" || saved === "weekly") state.tf = saved;
+    if (saved === "daily" || saved === "weekly" || saved === "monthly") state.tf = saved;
+    var savedIv = localStorage.getItem("em-iv");
+    if (savedIv && IV[savedIv]) state.iv = savedIv;
   } catch (e) {}
-  document.querySelectorAll(".seg button").forEach(function (x) {
+  document.querySelectorAll("#tf-seg button").forEach(function (x) {
     x.setAttribute("aria-selected", x.getAttribute("data-tf") === state.tf ? "true" : "false");
   });
+  markIv();
 
   loadData().then(function (d) {
     if (!d || !d.tickers) {
@@ -504,6 +587,7 @@
       loadData().then(function (nd) {
         if (nd && nd.tickers && nd.generatedAt !== state.data.generatedAt) {
           state.data = nd;
+          barCache = {};   // new candles were published with the new ranges
           renderMeta();
           render();
           renderChart();

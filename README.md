@@ -19,7 +19,8 @@ site-base/
 │  ├─ expected-moves.json  generated (sample data until the first run)
 │  └─ expected-moves.js    same data, so the page also works from disk
 ├─ scripts/fetch_expected_moves.py   computes the expected moves
-└─ .github/workflows/expected-moves.yml   runs the script every weekday
+└─ .github/workflows/deploy.yml   fetches fresh data and publishes the site
+   (data/bars/<SYMBOL>.json candle files are generated at publish time, not committed)
 ```
 
 ## 1. Make it yours (2 minutes)
@@ -30,10 +31,10 @@ Then edit the text in `index.html` (hero line, quick facts, about, project cards
 ## 2. Turn on automatic market data (one-time, free)
 
 1. Create a GitHub repo and upload this folder (or `git init` → `git push`).
-2. **Settings → Pages →** Source: *Deploy from a branch*, Branch: `main` / root. Your site goes live at `https://<you>.github.io/<repo>/`.
-3. **Settings → Actions → General →** Workflow permissions: *Read and write*.
-4. **Actions → Update expected moves → Run workflow** to run it once now.
-   After that it runs every 30 minutes during market hours on weekdays.
+2. **Settings → Pages →** Source: *GitHub Actions*. Your site goes live at `https://<you>.github.io/<repo>/`.
+3. **Actions → Build and publish site → Run workflow** to publish it once now.
+   After that it republishes with fresh data on every push, and every 30 minutes during market hours.
+   The numbers are built fresh each time and never committed, so the repo history stays small.
 
 **Live prices:** the Markets page streams trades from Finnhub (`finnhubKey` in `config.js`) and updates
 Price, Chg and **Used** (how much of the expected move has been covered) every few seconds. The ranges

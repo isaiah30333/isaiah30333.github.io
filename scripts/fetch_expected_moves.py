@@ -37,7 +37,19 @@ ROOT = Path(__file__).resolve().parent.parent
 WATCHLIST = ROOT / "data" / "watchlist.json"
 OUT_JSON = ROOT / "data" / "expected-moves.json"
 OUT_JS = ROOT / "data" / "expected-moves.js"
+BARS_DIR = ROOT / "data" / "bars"          # one candle file per ticker, loaded when it's charted
 ET = ZoneInfo("America/New_York")
+
+# chart key -> (yfinance interval, history period, sessions to keep or None for all)
+# 3m and 4h candles are built in the browser from the 1m and 1h data.
+BAR_SPECS = {
+    "1m":  ("1m",  "5d",  2),
+    "5m":  ("5m",  "1mo", 10),
+    "15m": ("15m", "1mo", None),
+    "1h":  ("60m", "6mo", 65),
+    "1d":  ("1d",  "2y",  None),
+    "1w":  ("1wk", "5y",  None),
+}
 
 
 # ---------------------------------------------------------------- dates
@@ -128,16 +140,18 @@ def move_block(anchor: float, iv: float, years: float, days: int, expiry: str, *
     }
 
 
-def fetch_bars(tk: yf.Ticker, interval: str, sessions: int) -> list:
-    """Recent candles as [time, open, high, low, close].
+def fetch_bars(tk: yf.Ticker, interval: str, period: str, sessions) -> list:
+    """Candles as [time, open, high, low, close].
     `time` is New York wall-clock time encoded as UTC seconds, so the chart's
-    time axis reads in ET without any timezone handling in the browser."""
-    h = tk.history(period="5d", interval=interval, prepost=False, auto_adjust=False)
+    time axis reads in ET without any timezone handling in the browser.
+    `sessions` keeps only the last N trading days (None keeps everything)."""
+    h = tk.history(period=period, interval=interval, prepost=False, auto_adjust=False)
     if h is None or h.empty:
         return []
     idx = h.index.tz_localize("UTC") if h.index.tz is None else h.index
     idx = idx.tz_convert(ET)
-    keep = set(sorted({ts.date() for ts in idx})[-sessions:])
+    dates = sorted({ts.date() for ts in idx})
+    keep = set(dates if sessions is None else dates[-sessions:])
     rows = []
     for ts, (o, hi, lo, c) in zip(idx, h[["Open", "High", "Low", "Close"]].itertuples(index=False, name=None)):
         if ts.date() not in keep or any(v != v for v in (o, hi, lo, c)):  # v != v → NaN
@@ -198,12 +212,28 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
         isWeekly=bool(in_week),
     )
 
-    # Candles for the chart: daily view = 5-min bars of the latest session,
-    # weekly view = 30-min bars of the last 5 sessions. Optional: chart falls back if missing.
-    try:
-        out["bars"] = {"d": fetch_bars(tk, "5m", 1), "w": fetch_bars(tk, "30m", 5)}
-    except Exception as e:
-        print(f"     {sym}: no bars ({e})", file=sys.stderr)
+    # --- monthly: next standard monthly expiry (3rd Friday, or Thursday before a holiday) after this week
+    def is_monthly(d: dt.date) -> bool:
+        return (d.weekday() == 4 and 15 <= d.day <= 21) or (d.weekday() == 3 and 14 <= d.day <= 20)
+    after_week = [x for x in exps if x[1] > w_date]
+    monthlies = [x for x in after_week if is_monthly(x[1])]
+    m_exp, m_date = monthlies[0] if monthlies else (after_week[0] if after_week else (w_exp, w_date))
+    m_iv, m_straddle = atm_snapshot(tk, m_exp, price, m_date, now)
+    m_iv = m_iv or w_iv
+    out["monthly"] = move_block(
+        price, m_iv, years_to_expiry(m_date, now), trading_days(sess, m_date), m_exp,
+        straddle=round(m_straddle, 4 if price < 5 else 2) if m_straddle else None,
+        isMonthly=bool(monthlies),
+    )
+
+    # Candles for the chart, every interval. Optional: the chart falls back if missing.
+    bars = {}
+    for key, (interval, period, sessions) in BAR_SPECS.items():
+        try:
+            bars[key] = fetch_bars(tk, interval, period, sessions)
+        except Exception as e:
+            print(f"     {sym}: no {key} bars ({e})", file=sys.stderr)
+    out["_bars"] = bars
     return out
 
 
@@ -229,12 +259,21 @@ def main() -> int:
         print("Every ticker failed. Keeping the previous data file.", file=sys.stderr)
         return 1
 
+    # candle files: data/bars/<SYMBOL>.json, fetched by the page only for the charted symbol
+    BARS_DIR.mkdir(parents=True, exist_ok=True)
+    for r in results:
+        bars = r.pop("_bars", None)
+        if bars and any(bars.values()):
+            (BARS_DIR / f"{r['symbol']}.json").write_text(
+                json.dumps({"symbol": r["symbol"], "generatedAt": now.isoformat(timespec="seconds"), "bars": bars},
+                           separators=(",", ":")), encoding="utf-8")
+
     payload = {
         "generatedAt": now.isoformat(timespec="seconds"),
         "session": sess.isoformat(),
         "sample": False,
         "source": "Yahoo Finance options chains (via yfinance)",
-        "method": "price × straddle-implied IV × √time (daily: 1/252 yr; weekly: time to expiry)",
+        "method": "price × straddle-implied IV × √time (daily: 1/252 yr; weekly/monthly: time to expiry)",
         "tickers": results,
     }
     # compact: the page downloads this every few minutes, and the candles make it large

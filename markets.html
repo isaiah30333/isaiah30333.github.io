@@ -7,10 +7,10 @@
   <meta name="description" content="Daily and weekly expected moves for SPY, QQQ and the largest S&amp;P 500 companies, based on options implied volatility.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/base.css?v=20261118b">
-  <link rel="stylesheet" href="assets/css/pages.css?v=20261118b">
-  <script src="assets/js/config.js?v=20261118b"></script>
-  <script src="assets/js/site.js?v=20261118b"></script>
+  <link rel="stylesheet" href="assets/css/base.css?v=20261118c">
+  <link rel="stylesheet" href="assets/css/pages.css?v=20261118c">
+  <script src="assets/js/config.js?v=20261118c"></script>
+  <script src="assets/js/site.js?v=20261118c"></script>
   <!-- TradingView's open-source charting library: draws the expected-move lines on the chart -->
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
@@ -27,9 +27,10 @@
       </div>
       <div class="head-controls">
       <span class="live-pill" id="live-status" data-state="off"><span class="live-dot"></span><span class="live-text">Prices from last update</span></span>
-      <div class="seg" role="tablist" aria-label="Timeframe">
+      <div class="seg" id="tf-seg" role="tablist" aria-label="Expected move horizon">
         <button role="tab" aria-selected="true" data-tf="daily">Daily</button>
         <button role="tab" aria-selected="false" data-tf="weekly">Weekly</button>
+        <button role="tab" aria-selected="false" data-tf="monthly">Monthly</button>
       </div>
       </div>
     </div>
@@ -47,6 +48,19 @@
         <div class="chart-title"><strong id="chart-sym">SPY</strong> <span class="muted" id="chart-name"></span></div>
         <div class="chart-em mono" id="chart-em"></div>
         <a class="muted small chart-tv" id="chart-tv" href="https://www.tradingview.com/" target="_blank" rel="noopener">Open in TradingView ↗</a>
+      </div>
+      <div class="chart-tools">
+        <div class="seg seg-sm" id="iv-seg" role="group" aria-label="Candle interval">
+          <button type="button" data-iv="1m">1m</button>
+          <button type="button" data-iv="3m">3m</button>
+          <button type="button" data-iv="5m">5m</button>
+          <button type="button" data-iv="15m">15m</button>
+          <button type="button" data-iv="1h">1h</button>
+          <button type="button" data-iv="4h">4h</button>
+          <button type="button" data-iv="1D">1D</button>
+          <button type="button" data-iv="1W">1W</button>
+        </div>
+        <span class="muted small chart-legend"><span class="lg up">- - EM high</span> <span class="lg down">- - EM low</span> <span class="lg">··· center</span></span>
       </div>
       <div id="tv-chart" class="tv-chart"></div>
     </section>
@@ -76,16 +90,16 @@
 
     <p class="fineprint muted">
       Expected move = price × implied volatility × √time, with volatility backed out of the at-the-money straddle.
-      Daily uses one trading day (IV ÷ 16); weekly uses the time left until expiry. That's a one-standard-deviation
+      Daily uses one trading day (IV ÷ 16); weekly and monthly use the time left until expiry. That's a one-standard-deviation
       range: the market prices roughly a 68% chance of finishing between Low and High. During market hours the daily
       range is centered on the previous close. <strong>Used</strong> shows how far the live price has traveled toward
-      the edge of the range (±100% = at Low/High). Weekly runs through this week's last expiry. Names without weekly
+      the edge of the range (±100% = at Low/High). Weekly runs through this week's last expiry; monthly runs through the next standard monthly expiry (third Friday). Names without weekly
       options (marked <span class="tag">M</span>) use the next monthly. Ranges refresh every 30 min during market hours.
       Live prices from Finnhub, options data from Yahoo Finance. Not investment advice.
     </p>
   </main>
 
   <footer class="site-footer" id="site-footer"></footer>
-  <script src="assets/js/markets.js?v=20261118b"></script>
+  <script src="assets/js/markets.js?v=20261118c"></script>
 </body>
 </html>

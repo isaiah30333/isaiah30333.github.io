@@ -1,0 +1,54 @@
+name: Build and publish site
+
+# Fetches fresh expected moves + candles and publishes the site to GitHub Pages.
+# The data is built fresh on every run and is NOT committed to the repo,
+# so the history stays small and clean.
+on:
+  push:
+    branches: [main]          # any edit to the site publishes right away
+  schedule:
+    # GitHub cron is in UTC: twice an hour from 13:00–21:59 UTC on weekdays
+    # (≈ 8am–5pm ET in winter, 9am–6pm ET in summer). Odd minutes (:07/:37) on purpose:
+    # GitHub delays or drops scheduled runs at busy times like :00 and :30.
+    - cron: "7,37 13-21 * * 1-5"
+  workflow_dispatch: {}        # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Compute expected moves and candles
+        # If Yahoo is down, still publish (the page shows the last saved numbers and their date)
+        continue-on-error: true
+        run: python scripts/fetch_expected_moves.py
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

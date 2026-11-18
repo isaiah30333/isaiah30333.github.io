@@ -352,6 +352,12 @@ code { border-bottom-width: 1px; }
 .chart-wrap { padding: 0; overflow: hidden; margin-bottom: 16px; scroll-margin-top: calc(var(--header-h) + 16px); }
 .chart-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; padding: 14px 20px; border-bottom: 1px solid var(--border); }
 .chart-em { font-size: .85rem; margin-right: auto; }
+.chart-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 10px 20px; border-bottom: 1px solid var(--border); }
+.seg-sm { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg-sm button { padding: 5px 11px; font-size: .8rem; font-family: var(--font-mono); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); font-weight: 600; }
+.seg button[aria-selected="true"] { color: var(--accent); }
+.chart-legend { display: flex; gap: 12px; font-family: var(--font-mono); }
 .chart-tv:hover { color: var(--text); }
 .tv-chart { height: clamp(340px, 55vh, 560px); }
 

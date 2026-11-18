@@ -13,15 +13,15 @@
   --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
 
   --bg: #ffffff;
-  --bg-subtle: #f5f7fa;             /* neutrals lean slightly cool to sit with navy */
+  --bg-subtle: #f7f6f3;             /* neutrals lean a touch warm to sit with bronze */
   --surface: #ffffff;
-  --border: #e5e8ed;
-  --border-strong: #d3d8e0;
+  --border: #e8e5de;
+  --border-strong: #d8d3c8;
 
-  /* hover glow (the Launchpad-style highlight used site-wide) */
-  --glow-1: #1E3A5F;
-  --glow-2: #5B9BD5;
-  --glow-strength: .16;
+  /* hover glow (the Launchpad-style highlight used site-wide): bronze → gold */
+  --glow-1: #8A6A1F;
+  --glow-2: #E8C36A;
+  --glow-strength: .18;
   --hover-fill: color-mix(in srgb, var(--accent) 4%, var(--surface));
   --text: #0b0b0f;
   --text-muted: #5c5c66;
@@ -51,14 +51,14 @@
   :root:not([data-theme="light"]) {
     --accent: var(--accent-dark);
     --accent-ink: #0b0b0f;
-    --bg: #0b0b0e;
-    --bg-subtle: #11141a;
-    --surface: #13161c;
-    --border: #232830;
-    --border-strong: #323946;
-    --glow-1: #3B6EA8;
-    --glow-2: #9DB7DA;
-    --glow-strength: .22;
+    --bg: #0b0a09;
+    --bg-subtle: #14130f;
+    --surface: #161511;
+    --border: #2a271f;
+    --border-strong: #3a352a;
+    --glow-1: #B8892E;
+    --glow-2: #F0D08A;
+    --glow-strength: .2;
     --hover-fill: color-mix(in srgb, var(--accent) 6%, var(--surface));
     --text: #f4f4f6;
     --text-muted: #a1a1ab;
@@ -73,14 +73,14 @@
 :root[data-theme="dark"] {
   --accent: var(--accent-dark);
   --accent-ink: #0b0b0f;
-  --bg: #0b0b0e;
-  --bg-subtle: #11141a;
-  --surface: #13161c;
-  --border: #232830;
-  --border-strong: #323946;
-  --glow-1: #3B6EA8;
-  --glow-2: #9DB7DA;
-  --glow-strength: .22;
+  --bg: #0b0a09;
+  --bg-subtle: #14130f;
+  --surface: #161511;
+  --border: #2a271f;
+  --border-strong: #3a352a;
+  --glow-1: #B8892E;
+  --glow-2: #F0D08A;
+  --glow-strength: .2;
   --hover-fill: color-mix(in srgb, var(--accent) 6%, var(--surface));
   --text: #f4f4f6;
   --text-muted: #a1a1ab;
