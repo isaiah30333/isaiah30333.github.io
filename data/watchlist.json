@@ -1,0 +1,21 @@
+{
+  "_comment": "Tickers for the Markets page. 'symbol' = Yahoo Finance symbol (use BRK-B, not BRK.B). 'tv' = TradingView symbol for the chart. 'pin: true' shows it as a big card at the top.",
+  "tickers": [
+    { "symbol": "SPY",   "tv": "AMEX:SPY",     "name": "SPDR S&P 500 ETF",        "pin": true },
+    { "symbol": "QQQ",   "tv": "NASDAQ:QQQ",   "name": "Invesco QQQ (Nasdaq-100)", "pin": true },
+    { "symbol": "NVDA",  "tv": "NASDAQ:NVDA",  "name": "NVIDIA" },
+    { "symbol": "AAPL",  "tv": "NASDAQ:AAPL",  "name": "Apple" },
+    { "symbol": "MSFT",  "tv": "NASDAQ:MSFT",  "name": "Microsoft" },
+    { "symbol": "AMZN",  "tv": "NASDAQ:AMZN",  "name": "Amazon" },
+    { "symbol": "GOOG",  "tv": "NASDAQ:GOOG",  "name": "Alphabet (Class C)" },
+    { "symbol": "META",  "tv": "NASDAQ:META",  "name": "Meta Platforms" },
+    { "symbol": "AVGO",  "tv": "NASDAQ:AVGO",  "name": "Broadcom" },
+    { "symbol": "TSLA",  "tv": "NASDAQ:TSLA",  "name": "Tesla" },
+    { "symbol": "BRK-B", "tv": "NYSE:BRK.B",   "name": "Berkshire Hathaway B" },
+    { "symbol": "JPM",   "tv": "NYSE:JPM",     "name": "JPMorgan Chase" },
+    { "symbol": "BAC",   "tv": "NYSE:BAC",     "name": "Bank of America" },
+    { "symbol": "CCL",   "tv": "NYSE:CCL",     "name": "Carnival" },
+    { "symbol": "BE",    "tv": "NYSE:BE",      "name": "Bloom Energy" },
+    { "symbol": "PDSB",  "tv": "NASDAQ:PDSB",  "name": "PDS Biotechnology" }
+  ]
+}

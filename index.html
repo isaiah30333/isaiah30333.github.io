@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{name}</title>
+  <meta name="description" content="Personal site: about, projects, markets dashboard and contact.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/pages.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/site.js"></script>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero container">
+      <p class="eyebrow reveal"><span data-site="tagline"></span></p>
+      <h1 class="reveal" style="--d:.05s"><span data-site="name"></span></h1>
+      <p class="lead reveal" style="--d:.1s">
+        A short line about who you are and what you're working on. Edit this in index.html.
+        Keep it to one or two sentences.
+      </p>
+      <div class="cta-row reveal" style="--d:.15s">
+        <a class="btn" data-site-href="linkedin" href="#" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10v7M8 7v.01M12 17v-4a2 2 0 0 1 4 0v4M12 10v7"/></svg>
+          LinkedIn
+        </a>
+        <a class="btn btn-ghost" data-gmail-compose href="#" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          Email me
+        </a>
+      </div>
+    </section>
+
+    <!-- QUICK FACTS -->
+    <section class="container">
+      <div class="facts reveal">
+        <div><span class="fact-k">Based in</span><span class="fact-v">Denver, Colorado</span></div>
+        <div><span class="fact-k">Focus</span><span class="fact-v">Markets &amp; software</span></div>
+        <div><span class="fact-k">Currently</span><span class="fact-v">Looking for jobs</span></div>
+        <div><span class="fact-k">Open to</span><span class="fact-v">Internships, projects</span></div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="section" id="about">
+      <div class="container about">
+        <div class="section-head reveal">
+          <p class="eyebrow">About</p>
+          <h2>A little more about me</h2>
+        </div>
+        <div class="about-body reveal">
+          <p>Write two or three short paragraphs here: your background, what you study or do, and what you care about.</p>
+          <p>This section is plain HTML. Copy a paragraph to add another, or delete it.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROJECTS / WORK -->
+    <section class="section" id="work">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">Work</p>
+          <h2>Projects &amp; experience</h2>
+          <p class="muted">Each card is one block of HTML. Duplicate it to add more.</p>
+        </div>
+        <div class="grid grid-3">
+          <a class="card project reveal" href="markets.html">
+            <span class="tag">Live tool</span>
+            <h3>Markets dashboard</h3>
+            <p class="muted">Daily and weekly expected moves for SPY, QQQ and the largest S&amp;P 500 names, updated automatically.</p>
+            <span class="card-link">Open →</span>
+          </a>
+          <a class="card project reveal" style="--d:.05s" href="#">
+            <span class="tag">Experience</span>
+            <h3>Role · Organization</h3>
+            <p class="muted">One line on what you did and the result. Numbers help.</p>
+            <span class="card-link">Details →</span>
+          </a>
+          <a class="card project reveal" style="--d:.1s" href="#">
+            <span class="tag">Project</span>
+            <h3>Project name</h3>
+            <p class="muted">One line on what it is and why it's interesting.</p>
+            <span class="card-link">View →</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="section" id="contact">
+      <div class="container">
+        <div class="contact-card reveal">
+          <div>
+            <p class="eyebrow">Contact</p>
+            <h2>Let's talk.</h2>
+            <p class="muted">The fastest way to reach me is email or LinkedIn.</p>
+          </div>
+          <div class="contact-links">
+            <a class="contact-row" data-gmail-compose href="#" target="_blank" rel="noopener">
+              <span class="contact-k">Gmail</span>
+              <span class="contact-v" data-site="email"></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+            <a class="contact-row" data-site-href="linkedin" href="#" target="_blank" rel="noopener">
+              <span class="contact-k">LinkedIn</span>
+              <span class="contact-v">View profile</span>
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="site-footer"></footer>
+</body>
+</html>

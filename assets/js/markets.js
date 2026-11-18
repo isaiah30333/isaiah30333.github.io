@@ -1,0 +1,386 @@
+/* Markets page: expected moves + live prices (Finnhub) + TradingView chart & ticker tape. */
+(function () {
+  var S = window.SITE || {};
+  var esc = window.SiteUtil.esc;
+  var root = document.documentElement;
+  var state = { tf: "daily", sort: null, dir: 1, data: null, symbol: null };
+  var live = {};          // yahoo symbol -> { price, pc }
+  var fhToSym = {};       // finnhub symbol -> yahoo symbol
+  var feed = "off";       // off | connecting | live | closed | error
+
+  /* ---------- formatting ---------- */
+  function money(v) {
+    if (v == null || isNaN(v)) return "—";
+    var d = Math.abs(v) < 5 ? 3 : 2;
+    return "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function pct(v, sign) {
+    if (v == null || isNaN(v)) return "—";
+    return (sign && v > 0 ? "+" : "") + v.toFixed(2) + "%";
+  }
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    return new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  function isDark() {
+    var t = root.getAttribute("data-theme");
+    return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function chgHtml(v) {
+    if (v == null || isNaN(v)) return '<span class="muted">—</span>';
+    return '<span class="' + (v >= 0 ? "up" : "down") + '">' + pct(v, true) + "</span>";
+  }
+  function usedHtml(u) {
+    if (u == null || isNaN(u)) return '<span class="muted">—</span>';
+    var cls = (u >= 0 ? "up" : "down") + (Math.abs(u) >= 100 ? " used-out" : "");
+    return '<span class="' + cls + '">' + (u > 0 ? "+" : "") + Math.round(u) + "%</span>";
+  }
+  function fhSymbol(sym) { return sym.replace("-", "."); }
+
+  /* ---------- market clock (ET) ---------- */
+  function marketOpen() {
+    var parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "numeric", hour12: false
+    }).formatToParts(new Date());
+    var p = {};
+    parts.forEach(function (x) { p[x.type] = x.value; });
+    var mins = (parseInt(p.hour, 10) % 24) * 60 + parseInt(p.minute, 10);
+    return ["Sat", "Sun"].indexOf(p.weekday) < 0 && mins >= 570 && mins < 960; // 9:30–16:00 (holidays ignored)
+  }
+
+  /* ---------- data ---------- */
+  function loadData() {
+    var fallback = window.EXPECTED_MOVES || null;
+    if (location.protocol.indexOf("http") !== 0) return Promise.resolve(fallback);
+    return fetch("data/expected-moves.json?t=" + Date.now())
+      .then(function (r) { return r.ok ? r.json() : fallback; })
+      .catch(function () { return fallback; });
+  }
+  function tickers() { return (state.data && state.data.tickers) || []; }
+
+  function rowsFor(tf) {
+    return tickers().map(function (t) {
+      var b = t[tf] || {};
+      var L = live[t.symbol] || {};
+      var price = L.price || t.price;
+      var pc = L.pc || t.prevClose;
+      var anchor = b.anchor != null ? b.anchor : t.price;
+      return {
+        t: t, symbol: t.symbol, price: price, isLive: !!L.price,
+        changePct: pc && price ? (price / pc - 1) * 100 : t.changePct,
+        iv: b.iv, move: b.move, movePct: b.movePct, low: b.low, high: b.high,
+        used: b.move && price != null && anchor != null ? (price - anchor) / b.move * 100 : null,
+        expiry: b.expiry, isWeekly: b.isWeekly, days: b.tradingDays, err: t.error
+      };
+    });
+  }
+
+  /* ---------- full render ---------- */
+  function renderMeta() {
+    var d = state.data;
+    var when = new Date(d.generatedAt);
+    var whenTxt = isNaN(when) ? d.generatedAt : when.toLocaleString("en-US", {
+      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short"
+    });
+    document.getElementById("em-meta").innerHTML =
+      "For the <strong>" + esc(fmtDate(d.session)) + "</strong> session · ranges updated " + esc(whenTxt);
+    document.getElementById("em-sample").hidden = !d.sample;
+  }
+
+  function dotLeft(u) { return u == null ? 50 : Math.max(0, Math.min(100, 50 + u / 2)); }
+
+  function renderPinned(rows) {
+    document.getElementById("em-pinned").innerHTML = rows.filter(function (r) { return r.t.pin && !r.err; }).map(function (r) {
+      var label = state.tf === "daily" ? "Daily expected move"
+        : "Weekly expected move · " + r.days + " trading day" + (r.days === 1 ? "" : "s");
+      return '<button class="card pin-card hover" data-sym="' + esc(r.symbol) + '">' +
+        '<div class="pin-top"><div><span class="pin-sym">' + esc(r.symbol) + '</span><span class="muted small">' + esc(r.t.name) + "</span></div>" +
+          '<div class="pin-price mono"><span data-k="price">' + money(r.price) + '</span> <span data-k="chg">' + chgHtml(r.changePct) + "</span></div></div>" +
+        '<div class="pin-move"><span class="muted small">' + label + '</span><span class="pin-big mono">±' + money(r.move) +
+          ' <span class="muted">(' + pct(r.movePct) + ")</span></span></div>" +
+        '<div class="range"><div class="range-track"><span class="range-dot" data-k="dot" style="left:' + dotLeft(r.used) + '%"></span></div>' +
+          '<div class="range-labels mono"><span>' + money(r.low) + '</span><span class="muted">used <span data-k="used">' + usedHtml(r.used) +
+          "</span> · exp " + esc(fmtDate(r.expiry)) + "</span><span>" + money(r.high) + "</span></div></div>" +
+      "</button>";
+    }).join("");
+  }
+
+  function renderTable(rows) {
+    if (state.sort) {
+      var k = state.sort, dir = state.dir;
+      rows = rows.slice().sort(function (a, b) {
+        var x = a[k], y = b[k];
+        if (x == null) return 1;
+        if (y == null) return -1;
+        return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir;
+      });
+    }
+    var maxPct = Math.max.apply(null, rows.map(function (r) { return r.movePct || 0; })) || 1;
+
+    document.querySelector("#em-table tbody").innerHTML = rows.map(function (r) {
+      var sel = r.symbol === state.symbol ? ' class="selected"' : "";
+      var first = '<td class="l"><span class="sym">' + esc(r.symbol) + '</span><span class="nm">' + esc(r.t.name || "") + "</span></td>";
+      if (r.err) {
+        return "<tr" + sel + ' data-sym="' + esc(r.symbol) + '">' + first +
+          '<td colspan="9" class="muted l">Couldn’t load: ' + esc(r.err) + "</td></tr>";
+      }
+      var monthly = state.tf === "weekly" && r.isWeekly === false
+        ? ' <span class="tag" title="No weekly options; using next monthly">M</span>' : "";
+      return "<tr" + sel + ' data-sym="' + esc(r.symbol) + '" tabindex="0">' + first +
+        '<td class="mono" data-k="price">' + money(r.price) + "</td>" +
+        '<td class="mono" data-k="chg">' + chgHtml(r.changePct) + "</td>" +
+        '<td class="mono">' + (r.iv != null ? (r.iv * 100).toFixed(1) + "%" : "—") + "</td>" +
+        '<td class="mono strong">±' + money(r.move) + "</td>" +
+        '<td class="mono bar-col"><div class="pbar"><span style="width:' + ((r.movePct || 0) / maxPct * 100).toFixed(1) + '%"></span></div>' + pct(r.movePct) + "</td>" +
+        '<td class="mono">' + money(r.low) + "</td>" +
+        '<td class="mono">' + money(r.high) + "</td>" +
+        '<td class="mono" data-k="used">' + usedHtml(r.used) + "</td>" +
+        '<td class="mono">' + esc(fmtDate(r.expiry)) + monthly + "</td>" +
+      "</tr>";
+    }).join("");
+
+    document.querySelectorAll("#em-table th").forEach(function (th) {
+      var on = th.getAttribute("data-sort") === state.sort;
+      th.setAttribute("aria-sort", on ? (state.dir > 0 ? "ascending" : "descending") : "none");
+    });
+  }
+
+  function render() {
+    var rows = rowsFor(state.tf);
+    renderPinned(rows);
+    renderTable(rows);
+  }
+
+  /* ---------- live paint: update cells in place (keeps hover/focus) ---------- */
+  var lastShown = {};
+  function paintLive() {
+    rowsFor(state.tf).forEach(function (r) {
+      if (r.err) return;
+      var prev = lastShown[r.symbol];
+      lastShown[r.symbol] = r.price;
+      document.querySelectorAll('[data-sym="' + r.symbol + '"]').forEach(function (host) {
+        var p = host.querySelector('[data-k="price"]');
+        if (p) {
+          p.textContent = money(r.price);
+          if (prev != null && r.price !== prev) {
+            p.classList.remove("tick-up", "tick-down");
+            void p.offsetWidth; // restart animation
+            p.classList.add(r.price > prev ? "tick-up" : "tick-down");
+          }
+        }
+        var c = host.querySelector('[data-k="chg"]');
+        if (c) c.innerHTML = chgHtml(r.changePct);
+        var u = host.querySelector('[data-k="used"]');
+        if (u) u.innerHTML = usedHtml(r.used);
+        var dot = host.querySelector('[data-k="dot"]');
+        if (dot) dot.style.left = dotLeft(r.used) + "%";
+      });
+    });
+  }
+  var paintTimer = null;
+  function schedulePaint() {
+    if (paintTimer) return;
+    paintTimer = setTimeout(function () { paintTimer = null; paintLive(); }, 400);
+  }
+
+  /* ---------- live status pill ---------- */
+  function setFeed(s) {
+    feed = s;
+    var el = document.getElementById("live-status");
+    var txt = {
+      off: "Prices from last update",
+      connecting: "Connecting…",
+      live: "Live",
+      closed: "Market closed · last trade",
+      error: "Live feed reconnecting…"
+    }[s];
+    el.setAttribute("data-state", s);
+    el.querySelector(".live-text").textContent = txt;
+  }
+
+  /* ---------- Finnhub: REST snapshot + websocket stream ---------- */
+  var KEY = S.finnhubKey || "";
+
+  function fetchQuotes() {
+    if (!KEY) return Promise.resolve();
+    return Promise.all(tickers().map(function (t) {
+      return fetch("https://finnhub.io/api/v1/quote?symbol=" + encodeURIComponent(fhSymbol(t.symbol)) + "&token=" + encodeURIComponent(KEY))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (q) {
+          if (q && q.c > 0) {
+            var L = live[t.symbol] || (live[t.symbol] = {});
+            // don't overwrite a fresher websocket trade with an older REST snapshot while open
+            if (!L.price || !marketOpen()) L.price = q.c;
+            if (q.pc > 0) L.pc = q.pc;
+          }
+        })
+        .catch(function () {});
+    })).then(schedulePaint);
+  }
+
+  var ws = null, retry = 0;
+  function connect() {
+    if (!KEY || !("WebSocket" in window)) return;
+    if (feed !== "live" && feed !== "closed") setFeed("connecting");
+    try {
+      ws = new WebSocket("wss://ws.finnhub.io?token=" + encodeURIComponent(KEY));
+    } catch (e) { setFeed("error"); return; }
+
+    ws.onopen = function () {
+      retry = 0;
+      tickers().forEach(function (t) {
+        var s = fhSymbol(t.symbol);
+        fhToSym[s] = t.symbol;
+        ws.send(JSON.stringify({ type: "subscribe", symbol: s }));
+      });
+      setFeed(marketOpen() ? "live" : "closed");
+    };
+    ws.onmessage = function (ev) {
+      var m;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.type !== "trade" || !m.data) return;
+      m.data.forEach(function (tr) {
+        var sym = fhToSym[tr.s];
+        if (!sym || !(tr.p > 0)) return;
+        (live[sym] || (live[sym] = {})).price = tr.p;
+      });
+      if (feed !== "live") setFeed("live");
+      schedulePaint();
+    };
+    ws.onclose = function () {
+      setFeed("error");
+      var wait = Math.min(30000, 1000 * Math.pow(2, retry++));
+      setTimeout(connect, wait);
+    };
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+
+  /* ---------- TradingView widgets ---------- */
+  function tvEmbed(host, script, config) {
+    host.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%">' +
+      '<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+    var s = document.createElement("script");
+    s.src = "https://s3.tradingview.com/external-embedding/" + script;
+    s.async = true;
+    s.text = JSON.stringify(config);
+    host.firstChild.appendChild(s);
+  }
+
+  var chartKey = "";
+  function renderChart() {
+    var t = tickers().filter(function (x) { return x.symbol === state.symbol; })[0];
+    if (!t) return;
+    var theme = isDark() ? "dark" : "light";
+    var key = t.tv + "|" + theme;
+    if (key === chartKey) return;
+    chartKey = key;
+    document.getElementById("chart-sym").textContent = t.symbol;
+    document.getElementById("chart-name").textContent = t.name || "";
+    tvEmbed(document.getElementById("tv-chart"), "embed-widget-advanced-chart.js", {
+      autosize: true, symbol: t.tv, interval: "D", timezone: "America/New_York",
+      theme: theme, style: "1", locale: "en",
+      backgroundColor: theme === "dark" ? "rgba(20,20,24,1)" : "rgba(255,255,255,1)",
+      hide_side_toolbar: true, allow_symbol_change: true, calendar: false,
+      support_host: "https://www.tradingview.com"
+    });
+  }
+
+  var tapeKey = "";
+  function renderTape() {
+    if (S.tickerTape === false) return;
+    var host = document.getElementById("tv-tape");
+    var theme = isDark() ? "dark" : "light";
+    if (theme === tapeKey) return;
+    tapeKey = theme;
+    host.hidden = false;
+    tvEmbed(host, "embed-widget-ticker-tape.js", {
+      symbols: tickers().map(function (t) { return { proName: t.tv, title: t.symbol }; }),
+      showSymbolLogo: true, isTransparent: true, displayMode: "adaptive",
+      colorTheme: theme, locale: "en"
+    });
+  }
+
+  function select(sym, scroll) {
+    state.symbol = sym;
+    render();
+    renderChart();
+    if (scroll) document.querySelector(".chart-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ---------- events ---------- */
+  document.querySelectorAll(".seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.tf = b.getAttribute("data-tf");
+      document.querySelectorAll(".seg button").forEach(function (x) {
+        x.setAttribute("aria-selected", x === b ? "true" : "false");
+      });
+      try { localStorage.setItem("em-tf", state.tf); } catch (e) {}
+      render();
+    });
+  });
+
+  document.querySelectorAll("#em-table th[data-sort]").forEach(function (th) {
+    th.addEventListener("click", function () {
+      var k = th.getAttribute("data-sort");
+      if (state.sort === k) state.dir = -state.dir;
+      else { state.sort = k; state.dir = k === "symbol" || k === "expiry" ? 1 : -1; }
+      render();
+    });
+  });
+
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-sym]");
+    if (el && (el.closest("#em-table") || el.closest("#em-pinned"))) select(el.getAttribute("data-sym"), true);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var tr = e.target.closest && e.target.closest("#em-table tr[data-sym]");
+    if (tr) select(tr.getAttribute("data-sym"), true);
+  });
+
+  function onTheme() { if (state.data) { renderChart(); renderTape(); } }
+  new MutationObserver(onTheme).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onTheme);
+
+  /* ---------- boot ---------- */
+  try {
+    var saved = localStorage.getItem("em-tf");
+    if (saved === "daily" || saved === "weekly") state.tf = saved;
+  } catch (e) {}
+  document.querySelectorAll(".seg button").forEach(function (x) {
+    x.setAttribute("aria-selected", x.getAttribute("data-tf") === state.tf ? "true" : "false");
+  });
+
+  loadData().then(function (d) {
+    if (!d || !d.tickers) {
+      document.getElementById("em-meta").textContent = "No data yet. Run the GitHub Action or scripts/fetch_expected_moves.py.";
+      return;
+    }
+    state.data = d;
+    state.symbol = (d.tickers[0] || {}).symbol;
+    renderMeta();
+    render();
+    renderChart();
+    renderTape();
+
+    // live prices
+    fetchQuotes();
+    connect();
+    var every = Math.max(30, S.liveQuoteRefreshSeconds || 60) * 1000;
+    setInterval(fetchQuotes, every);
+    setInterval(function () {
+      if (feed === "live" || feed === "closed") setFeed(marketOpen() ? "live" : "closed");
+    }, 60000);
+
+    // pick up new ranges from the 30-minute job without a reload (hosted only)
+    setInterval(function () {
+      loadData().then(function (nd) {
+        if (nd && nd.tickers && nd.generatedAt !== state.data.generatedAt) {
+          state.data = nd;
+          renderMeta();
+          render();
+        }
+      });
+    }, 5 * 60000);
+  });
+})();

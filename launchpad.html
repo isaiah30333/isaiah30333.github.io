@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Launchpad · {name}</title>
+  <meta name="description" content="Quick links to the AI tools and apps I use every day.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/pages.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/site.js"></script>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <main class="container page">
+    <div class="page-head reveal">
+      <p class="eyebrow">Launchpad</p>
+      <h1 class="h-page">Jump in.</h1>
+      <p class="muted">Press <kbd>1</kbd>–<kbd>9</kbd> to open a tile. Tiles are set in <code>assets/js/config.js</code>.</p>
+    </div>
+
+    <div class="launch-grid" id="launch-grid"></div>
+    <div class="toast" id="launch-toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <footer class="site-footer" id="site-footer"></footer>
+
+  <script>
+  (function () {
+    var tiles = (window.SITE && window.SITE.launchpad) || [];
+    var esc = window.SiteUtil.esc;
+    var grid = document.getElementById("launch-grid");
+
+    grid.innerHTML = tiles.map(function (t, i) {
+      var initials = t.name.replace(/[^A-Za-z0-9 ]/g, "").split(" ").map(function (w) { return w[0]; }).join("").slice(0, 2);
+      var target = t.app ? "" : ' target="_blank" rel="noopener"';
+      return '<a class="launch-tile reveal" style="--d:' + (i * 0.04) + 's;--tile:' + esc(t.color || "var(--accent)") + '"' +
+        ' href="' + esc(t.url) + '"' + target + ' data-i="' + i + '">' +
+          '<span class="launch-key mono">' + (i < 9 ? i + 1 : "") + "</span>" +
+          '<span class="launch-icon" aria-hidden="true">' + esc(initials) + "</span>" +
+          '<span class="launch-name">' + esc(t.name) + "</span>" +
+          '<span class="launch-desc">' + esc(t.desc || "") + "</span>" +
+          (t.app ? '<span class="tag launch-tag">App</span>' : '<span class="launch-arrow" aria-hidden="true">↗</span>') +
+        "</a>";
+    }).join("");
+
+    // Desktop-app tiles: open via the app's link; show a quiet "didn't open?" hint with the fallback site.
+    var toast = document.getElementById("launch-toast");
+    var toastTimer;
+    function openTile(i) {
+      var t = tiles[i];
+      if (!t) return;
+      if (!t.app) { window.open(t.url, "_blank", "noopener"); return; }
+      window.location.href = t.url;
+      if (t.fallback) {
+        clearTimeout(toastTimer);
+        toast.innerHTML = "Opening " + esc(t.name) + "… Didn’t open? " +
+          '<a href="' + esc(t.fallback) + '" target="_blank" rel="noopener">Get ' + esc(t.name) + " ↗</a>";
+        toast.classList.add("show");
+        toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 6000);
+      }
+    }
+
+    grid.addEventListener("click", function (e) {
+      var a = e.target.closest(".launch-tile");
+      if (!a) return;
+      var t = tiles[+a.getAttribute("data-i")];
+      if (t && t.app) { e.preventDefault(); openTile(+a.getAttribute("data-i")); }
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (/input|textarea|select/i.test(document.activeElement.tagName)) return;
+      var n = parseInt(e.key, 10);
+      if (n >= 1 && n <= 9 && tiles[n - 1]) {
+        var el = grid.querySelector('[data-i="' + (n - 1) + '"]');
+        if (el) { el.classList.add("pressed"); setTimeout(function () { el.classList.remove("pressed"); }, 180); }
+        openTile(n - 1);
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
