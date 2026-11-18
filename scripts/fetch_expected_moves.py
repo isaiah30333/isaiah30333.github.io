@@ -237,7 +237,8 @@ def main() -> int:
         "method": "price × straddle-implied IV × √time (daily: 1/252 yr; weekly: time to expiry)",
         "tickers": results,
     }
-    text = json.dumps(payload, indent=2, ensure_ascii=False)
+    # compact: the page downloads this every few minutes, and the candles make it large
+    text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
     OUT_JSON.write_text(text + "\n", encoding="utf-8")
     OUT_JS.write_text("window.EXPECTED_MOVES = " + text + ";\n", encoding="utf-8")
     print(f"Wrote {len(results) - failed}/{len(items)} tickers for session {sess}")

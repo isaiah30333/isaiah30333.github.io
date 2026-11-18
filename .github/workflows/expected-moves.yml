@@ -2,10 +2,10 @@ name: Update expected moves
 
 on:
   schedule:
-    # GitHub cron is in UTC: every 30 min from 13:00–21:30 UTC on weekdays
-    # (≈ 8:00am–4:30pm ET in winter, 9:00am–5:30pm ET in summer).
-    # GitHub can start scheduled runs a few minutes late.
-    - cron: "*/30 13-21 * * 1-5"
+    # GitHub cron is in UTC: twice an hour from 13:00–21:59 UTC on weekdays
+    # (≈ 8am–5pm ET in winter, 9am–6pm ET in summer). Odd minutes (:07/:37) on purpose:
+    # GitHub delays or drops scheduled runs at busy times like :00 and :30.
+    - cron: "7,37 13-21 * * 1-5"
   workflow_dispatch: {}        # adds a "Run workflow" button in the Actions tab
 
 permissions:
