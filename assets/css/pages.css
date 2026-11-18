@@ -48,8 +48,59 @@ code { border-bottom-width: 1px; }
   transform: translateY(-4px) scale(1.02);
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent), var(--shadow-lg);   /* 2px outline without layout shift */
-  background: var(--bg-subtle);
+  background: var(--hover-fill);
 }
+
+/* ---------- glow highlight (same effect as the Launchpad tiles) ----------
+   A soft navy→sky light blob fades in from the bottom-right corner on hover. */
+.facts > div,
+.card.project,
+.contact-row,
+.pin-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.facts > div::after,
+.card.project::after,
+.contact-row::after,
+.pin-card::after {
+  content: "";
+  position: absolute;
+  right: -25%;
+  bottom: -60%;
+  width: 75%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, var(--glow-2), var(--glow-1) 55%, transparent 72%);
+  filter: blur(38px);
+  opacity: 0;
+  transition: opacity .35s ease;
+  pointer-events: none;
+  z-index: -1;
+}
+.facts > div:hover::after,
+.card.project:hover::after,
+.contact-row:hover::after,
+.pin-card:hover::after { opacity: var(--glow-strength); }
+.card.project.span-full::after { width: 40%; right: -10%; }
+
+/* faint navy wash behind the hero and inner-page headings */
+.hero, .page-head { position: relative; isolation: isolate; }
+.hero::before, .page-head::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -120px;
+  right: -10%;
+  width: min(640px, 80vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--glow-2) 22%, transparent), color-mix(in srgb, var(--glow-1) 8%, transparent) 45%, transparent 70%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+.page-head::before { width: min(420px, 70vw); top: -160px; opacity: .8; }
 .facts > div:hover .fact-k { color: var(--accent); }
 .facts > div:hover .fact-v { color: var(--accent); font-weight: 600; }
 @media (max-width: 760px) {
@@ -93,7 +144,8 @@ code { border-bottom-width: 1px; }
   border-radius: var(--radius);
   transition: border-color .15s, transform .15s;
 }
-.contact-row:hover { border-color: var(--accent); transform: translateX(2px); }
+.contact-row:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-lg); background: var(--hover-fill); transform: translateY(-2px); }
+.contact-row:hover .contact-k { color: var(--accent); }
 .contact-k { font-family: var(--font-mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); }
 .contact-v { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) { .contact-card { grid-template-columns: 1fr; gap: 24px; } .contact-row { grid-template-columns: 70px 1fr auto; } }
@@ -259,6 +311,8 @@ code { border-bottom-width: 1px; }
 @media (max-width: 1000px) { .grid.pinned { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px)  { .grid.pinned { grid-template-columns: 1fr; } }
 .pinned .pin-card { padding: 20px; }
+.pin-card:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-lg); background: var(--hover-fill); }
+.pin-card:hover .pin-sym { color: var(--accent); }
 .pinned .pin-big { font-size: clamp(1.35rem, 2.2vw, 1.75rem); }
 .pin-card {
   text-align: left;
@@ -325,7 +379,9 @@ code { border-bottom-width: 1px; }
 .em-table th[aria-sort="descending"]::after { content: " ↓"; }
 .em-table tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
 .em-table tbody tr:last-child { border-bottom: 0; }
-.em-table tbody tr:hover { background: var(--bg-subtle); }
+.em-table tbody tr:hover { background: var(--hover-fill); }
+.em-table tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accent); }   /* on the cell: row shadows don't render everywhere */
+.em-table tbody tr:hover .sym { color: var(--accent); }
 .em-table tbody tr.selected { background: var(--accent-soft); }
 .em-table .sym { font-weight: 600; display: block; }
 .em-table .nm { font-size: .78rem; color: var(--text-muted); }
