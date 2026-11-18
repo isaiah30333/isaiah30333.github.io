@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{name}</title>
+  <title>Isaiah Cordova · Finance &amp; Investment Analysis</title>
   <meta name="description" content="Personal site: about, projects, markets dashboard and contact.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,8 +21,8 @@
       <p class="eyebrow reveal"><span data-site="tagline"></span></p>
       <h1 class="reveal" style="--d:.05s"><span data-site="name"></span></h1>
       <p class="lead reveal" style="--d:.1s">
-        Finance undergraduate at Colorado State University concentrating in Investment Analysis.
-        Derivatives trader applying quantitative modeling, options volatility, and disciplined risk controls to equity and index markets.
+        Finance student at Colorado State University, concentrating in Investment Analysis.
+        I cover consumer staples for CSU's Pioneer Student Investment Fund and have traded index options on my own account since 2021.
       </p>
       <div class="cta-row reveal" style="--d:.15s">
         <a class="btn" data-site-href="linkedin" href="#" target="_blank" rel="noopener">
@@ -51,23 +51,26 @@
       <div class="container about">
         <div class="section-head reveal">
           <p class="eyebrow">About</p>
-          <h2>Driven by data, risk control &amp; market mechanics</h2>
+          <h2>About me</h2>
         </div>
         <div class="about-body reveal">
           <p>
-            I am a Business Finance undergraduate at <strong>Colorado State University</strong> (graduating December 2026) concentrating in <strong>Investment Analysis</strong>. I am working toward the <strong>Chartered Market Technician (CMT)</strong> and <strong>Chartered Financial Analyst (CFA)</strong> designations.
+            I'm finishing a Business Finance degree at <strong>Colorado State University</strong> with a concentration in <strong>Investment Analysis</strong>, graduating in December 2026. After graduation I plan to start the <strong>CFA</strong> program, with the <strong>CMT</strong> to follow.
           </p>
           <p>
-            <strong>Quantitative Trading &amp; Track Record:</strong> Since July 2021, I have actively managed a self-directed equities and options portfolio specializing in SPX, SPY, and high-volatility instruments. By applying strict mathematical risk frameworks and order-flow/momentum execution, I achieved a <strong>68% win rate</strong>, an average return of <strong>+$205/day</strong>, and a <strong>+$4.5K net return in July 2025</strong>. This hands-on market experience directly inspired the quantitative Expected Moves models powering the Markets tool on this site.
+            At CSU I'm an analyst in the <strong>Pioneer Student Investment Fund</strong>, a student-run portfolio of about $600K benchmarked against the S&amp;P 500, taught in the same class as the Summit Fund. I'm on the <strong>consumer staples</strong> sector team. I pitched <strong>Unilever</strong> to the fund and helped build our team's pitch on <strong>Monster Beverage</strong>, using a DCF, comparable company multiples, and our own growth projections. In the Fall 2026 market update I presented portfolio performance, walking the class through our returns against the S&amp;P 500 and the Bloomberg attribution behind them. I'm also on the fund's <strong>Recruitment Committee</strong>, and I gave the recruiting presentation to more than 200 students.
           </p>
           <p>
-            <strong>CSU Summit Fund:</strong> In my <strong>sector role</strong>, I worked with my team to pitch <strong>two consumer staples stocks</strong>, building the case from DCF valuation, comparable multiples, and growth projections. In my <strong>functional role in recruiting</strong>, I delivered the Summit Fund recruiting presentation to <strong>200+ students</strong>.
+            In my Enterprise Valuation class, I built the industry regression for our group's valuation of <strong>Johnson &amp; Johnson</strong>. It regresses forward P/E on expected revenue growth and EBITDA margin across 14 pharma and MedTech peers to estimate the multiple J&amp;J's fundamentals actually support, instead of assuming it deserves the peer median.
           </p>
           <p>
-            <strong>Customer Operations:</strong> At Walking Stick Golf Course, I drove customer operations serving <strong>50+ clients daily</strong> under rapid turnaround.
+            Outside of class, I've traded SPX and SPY options on my own account since 2021. Watching how much movement the options market prices in each day is what led me to build the Expected Moves tool on this site.
           </p>
           <p>
-            <strong>Core Competencies:</strong> Discounted Cash Flow (DCF) Valuation · Comparable Multiples · Options Implied Volatility &amp; Expected Move Math · Portfolio Risk Management &amp; Capital Allocation · Bloomberg Terminal · TradingView · Excel Modeling · CSU Finance Club.
+            I also worked in the golf shop and cart barn at Walking Stick Golf Course in Pueblo, ringing up purchases and keeping check-ins moving for 50+ customers a day.
+          </p>
+          <p>
+            <strong>Skills and tools:</strong> DCF valuation · Comparable multiples · Options and implied volatility · Bloomberg Terminal · TradingView · Excel
           </p>
         </div>
       </div>
@@ -77,34 +80,40 @@
     <section class="section" id="work">
       <div class="container">
         <div class="section-head reveal">
-          <p class="eyebrow">Accomplishments</p>
-          <h2>Projects &amp; performance record</h2>
-          <p class="muted">Key outcomes across trading, quantitative development, and leadership.</p>
+          <p class="eyebrow">Work</p>
+          <h2>Projects &amp; experience</h2>
         </div>
         <div class="grid grid-2">
-          <a class="card project reveal" href="markets.html">
+          <div class="card project reveal">
+            <span class="tag">Student-Managed Fund</span>
+            <h3>Pioneer Student Investment Fund</h3>
+            <p class="muted"><strong>Consumer staples sector:</strong> pitched Unilever and helped build the team's Monster Beverage pitch, backed by a DCF, comparable company multiples, and growth projections.</p>
+            <p class="muted"><strong>Market update:</strong> presented portfolio performance and Bloomberg attribution against the S&amp;P 500 benchmark.</p>
+            <p class="muted"><strong>Recruitment Committee:</strong> gave the fund's recruiting presentation to 200+ students.</p>
+            <span class="card-link">Colorado State University · Fall 2026</span>
+          </div>
+          <div class="card project reveal" style="--d:.05s">
+            <span class="tag">Enterprise Valuation</span>
+            <h3>Johnson &amp; Johnson Valuation</h3>
+            <p class="muted">Group valuation for my Enterprise Valuation class. I built the industry regression: forward P/E against expected revenue growth and EBITDA margin across 14 pharma and MedTech peers, run with Excel's LINEST.</p>
+            <span class="card-link">Fall 2026</span>
+          </div>
+          <a class="card project reveal" href="markets.html" style="--d:.1s">
             <span class="tag">Live Tool</span>
-            <h3>Expected Moves Analytics Engine</h3>
-            <p class="muted">Engineered a real-time options analytics platform calculating 1-standard-deviation daily and weekly price bands for major indices and large-cap equities via live WebSockets and ATM straddle volatility models.</p>
+            <h3>Expected Moves</h3>
+            <p class="muted">A live page that turns at-the-money straddle prices into one-standard-deviation daily and weekly ranges for major indices and large-cap stocks, with streaming prices.</p>
             <span class="card-link">Open live tool →</span>
           </a>
-          <div class="card project reveal" style="--d:.05s">
-            <span class="tag">Quantitative Trading</span>
-            <h3>Self-Directed Equities &amp; Options Portfolio</h3>
-            <p class="muted">Generated +$4.5K net profit in July 2025 with a 68% win rate and $205/day average return specializing in SPX and high-beta instruments using disciplined risk-to-reward parameters.</p>
+          <div class="card project reveal" style="--d:.15s">
+            <span class="tag">Personal Trading</span>
+            <h3>Index Options</h3>
+            <p class="muted">Trading SPX and SPY options on my own account. This is where the idea for the Expected Moves tool came from.</p>
             <span class="card-link">July 2021 – Present</span>
           </div>
-          <div class="card project reveal" style="--d:.1s">
-            <span class="tag">Student-Managed Fund</span>
-            <h3>CSU Summit Fund · Sector &amp; Recruiting Roles</h3>
-            <p class="muted"><strong>Sector role:</strong> pitched two consumer staples stocks to the fund, backed by DCF valuation, comparable multiples, and growth projections.</p>
-            <p class="muted"><strong>Functional role, Recruiting:</strong> delivered the Summit Fund recruiting presentation to 200+ students.</p>
-            <span class="card-link">Colorado State University</span>
-          </div>
-          <div class="card project reveal" style="--d:.15s">
+          <div class="card project reveal" style="--d:.2s">
             <span class="tag">Equity Research</span>
             <h3>CSU Finance Club</h3>
-            <p class="muted">Active member analyzing daily market dynamics, developing collaborative valuation models (DCF and market multiples), and exploring institutional capital allocation strategies.</p>
+            <p class="muted">Member since 2024. Build stock valuations with other members using DCF and trading multiples.</p>
             <span class="card-link">Sept 2024 – Present</span>
           </div>
         </div>
