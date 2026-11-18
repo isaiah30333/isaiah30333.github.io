@@ -6,7 +6,7 @@
 window.SITE = {
   /* ---- Identity (shown in the shared header + footer) ---- */
   name: "Isaiah Cordova",       // ← put your name or brand here
-  tagline: "Builder · Investor · Student",
+  tagline: "Finance & Investment Analysis",
   monogram: "IC",              // 1–3 letters shown in the header badge
 
   /* ---- Contact ---- */
