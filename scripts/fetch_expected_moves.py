@@ -5,12 +5,12 @@ works when opened straight from disk).
 
 Method
 ------
-Expected move (1 standard deviation) = price x IV x sqrt(trading_days / 252)
+Expected move (1 standard deviation) = price x IV x sqrt(time)
 
-  * IV comes from the at-the-money call and put (averaged) on Yahoo Finance.
-  * Daily  = 1 trading day, using IV from the nearest expiry that isn't expiring
-             in the session itself (0DTE IV is too noisy).
-  * Weekly = trading days left through this week's last expiry (normally Friday).
+  * IV is backed out of the at-the-money straddle (call + put) on Yahoo Finance.
+  * Daily  = IV / sqrt(252) (the "rule of 16"), using the nearest expiry that isn't
+             expiring in the session itself (0DTE prices are too noisy).
+  * Weekly = calendar time left until this week's last expiry (normally Friday 4pm ET).
              The ATM straddle price for that expiry is saved too. Traders often
              quote the straddle (or 0.85 x straddle) as "the expected move".
 
@@ -77,8 +77,18 @@ def mid_price(row) -> float:
     return last
 
 
-def atm_snapshot(tk: yf.Ticker, expiry: str, price: float, exp_date: dt.date, today: dt.date):
-    """Return (iv, straddle) at the strike closest to price for one expiry."""
+def years_to_expiry(exp_date: dt.date, now: dt.datetime) -> float:
+    """Calendar time from now to the 4pm ET close on expiry day (min 6 hours)."""
+    close = dt.datetime.combine(exp_date, dt.time(16, 0), tzinfo=ET)
+    return max((close - now).total_seconds(), 6 * 3600) / (365 * 86400)
+
+
+def atm_snapshot(tk: yf.Ticker, expiry: str, price: float, exp_date: dt.date, now: dt.datetime):
+    """Return (iv, straddle) at the strike closest to price for one expiry.
+
+    IV is backed out of the ATM straddle's time value (straddle ≈ 0.798 · S · σ · √T), which
+    tracks real option prices. Yahoo's own impliedVolatility field goes stale outside market
+    hours, so it's only a fallback."""
     chain = tk.option_chain(expiry)
     calls, puts = chain.calls, chain.puts
     strikes = sorted(set(calls["strike"]).intersection(puts["strike"]))
@@ -89,22 +99,21 @@ def atm_snapshot(tk: yf.Ticker, expiry: str, price: float, exp_date: dt.date, to
     p = puts[puts["strike"] == k].iloc[0]
 
     straddle = mid_price(c) + mid_price(p)
+    time_value = straddle - abs(price - k)   # strip intrinsic value if the strike isn't exactly ATM
 
-    ivs = [v for v in (_num(c.get("impliedVolatility")), _num(p.get("impliedVolatility"))) if 0.02 < v < 5]
-    iv = sum(ivs) / len(ivs) if ivs else None
-
-    # Yahoo's IV is sometimes junk outside market hours. Back it out of the straddle instead:
-    # straddle ≈ 0.8 · S · σ · √T
-    if iv is None and straddle > 0:
-        t_years = max((exp_date - today).days, 1) / 365
-        iv = straddle / (0.8 * price * math.sqrt(t_years))
+    iv = None
+    if time_value > 0:
+        iv = time_value / (0.7979 * price * math.sqrt(years_to_expiry(exp_date, now)))
+    if iv is None or not (0.02 < iv < 5):
+        ivs = [v for v in (_num(c.get("impliedVolatility")), _num(p.get("impliedVolatility"))) if 0.02 < v < 5]
+        iv = sum(ivs) / len(ivs) if ivs else None
     return iv, (straddle if straddle > 0 else None)
 
 
-def move_block(anchor: float, iv: float, days: int, expiry: str, **extra) -> dict:
+def move_block(anchor: float, iv: float, years: float, days: int, expiry: str, **extra) -> dict:
     """Range is centred on `anchor` (prev close for the live daily session, else last price)."""
     nd = 4 if anchor < 5 else 2
-    move = anchor * iv * math.sqrt(days / 252)
+    move = anchor * iv * math.sqrt(years)
     return {
         "expiry": expiry,
         "iv": round(iv, 4),
@@ -142,7 +151,7 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     friday = sess + dt.timedelta(days=(4 - sess.weekday()))
     in_week = [x for x in exps if x[1] <= friday]
     w_exp, w_date = in_week[-1] if in_week else exps[0]
-    w_iv, w_straddle = atm_snapshot(tk, w_exp, price, w_date, today)
+    w_iv, w_straddle = atm_snapshot(tk, w_exp, price, w_date, now)
 
     # --- daily: nearest expiry after the session day (avoids noisy 0DTE IV)
     later = [x for x in exps if x[1] > sess]
@@ -150,7 +159,7 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     if (d_exp, d_date) == (w_exp, w_date):
         d_iv = w_iv
     else:
-        d_iv, _ = atm_snapshot(tk, d_exp, price, d_date, today)
+        d_iv, _ = atm_snapshot(tk, d_exp, price, d_date, now)
     d_iv = d_iv or w_iv
     w_iv = w_iv or d_iv
     if not d_iv:
@@ -160,9 +169,10 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     # so it doesn't drift every time the job re-runs; the page shows the live price against it.
     in_session = sess == today and (now.hour, now.minute) >= (9, 30)
     d_anchor = prev if (in_session and prev > 0) else price
-    out["daily"] = move_block(d_anchor, d_iv, 1, sess.isoformat(), ivExpiry=d_exp)
+    # daily: one session = IV / √252 ("rule of 16"); weekly: calendar time left to expiry
+    out["daily"] = move_block(d_anchor, d_iv, 1 / 252, 1, sess.isoformat(), ivExpiry=d_exp)
     out["weekly"] = move_block(
-        price, w_iv, trading_days(sess, w_date), w_exp,
+        price, w_iv, years_to_expiry(w_date, now), trading_days(sess, w_date), w_exp,
         straddle=round(w_straddle, 4 if price < 5 else 2) if w_straddle else None,
         isWeekly=bool(in_week),
     )
@@ -196,7 +206,7 @@ def main() -> int:
         "session": sess.isoformat(),
         "sample": False,
         "source": "Yahoo Finance options chains (via yfinance)",
-        "method": "price × ATM IV × √(trading days / 252)",
+        "method": "price × straddle-implied IV × √time (daily: 1/252 yr; weekly: time to expiry)",
         "tickers": results,
     }
     text = json.dumps(payload, indent=2, ensure_ascii=False)

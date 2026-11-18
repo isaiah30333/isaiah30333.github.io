@@ -44,7 +44,9 @@ When the first run finishes, the yellow "Sample data" notice goes away.
 
 **Change tickers:** edit `data/watchlist.json`. `symbol` is the Yahoo symbol (`BRK-B`) and `tv` is the TradingView symbol (`NYSE:BRK.B`).
 
-**How the move is calculated:** price × at-the-money implied volatility × √(trading days ÷ 252).
+**How the move is calculated:** price × implied volatility × √time. The volatility is backed out of the
+at-the-money straddle (Yahoo's own IV field goes stale after hours). Daily = one trading day (IV ÷ 16),
+weekly = calendar time left until this week's expiry.
 That's a one-standard-deviation range, so roughly a 68% chance of finishing inside it. The weekly view also stores
 the ATM straddle price. Small caps without weekly options (e.g. PDSB) fall back to the next monthly expiry and are marked **M**.
 

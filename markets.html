@@ -74,7 +74,8 @@
     </div>
 
     <p class="fineprint muted">
-      Expected move = price × at-the-money implied volatility × √(trading days ÷ 252). That's a one-standard-deviation
+      Expected move = price × implied volatility × √time, with volatility backed out of the at-the-money straddle.
+      Daily uses one trading day (IV ÷ 16); weekly uses the time left until expiry. That's a one-standard-deviation
       range: the market prices roughly a 68% chance of finishing between Low and High. During market hours the daily
       range is centered on the previous close. <strong>Used</strong> shows how far the live price has traveled toward
       the edge of the range (±100% = at Low/High). Weekly runs through this week's last expiry. Names without weekly
