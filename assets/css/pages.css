@@ -50,6 +50,7 @@ code { border-bottom-width: 1px; }
 .project h3 { margin: 6px 0 0; }
 .project p { margin: 0; flex: 1; }
 .project .tag { align-self: flex-start; }
+.grid > .span-full { grid-column: 1 / -1; }   /* featured card gets its own row */
 .card-link { font-size: .9rem; font-weight: 500; color: var(--accent); }
 
 .contact-card {
