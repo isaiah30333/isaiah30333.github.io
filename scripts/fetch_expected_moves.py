@@ -83,6 +83,29 @@ def _num(x) -> float:
         return 0.0
 
 
+def last_and_prev(daily, hourly=None):
+    """(latest close, previous close, date of the latest close).
+
+    Daily bars carry the official closes, but Yahoo sometimes leaves the newest daily
+    bar out for a few hours (seen right after midnight UTC, i.e. ~7-8pm ET), which made
+    the site show the prior session's numbers as "today". If the hourly bars reach a
+    newer session than the daily bars, use that session's last hourly close as the price
+    and the last daily close as the previous close."""
+    daily = daily.dropna() if daily is not None else None
+    hourly = hourly.dropna() if hourly is not None else None
+    if daily is None or not len(daily):
+        return 0.0, 0.0, None
+    d_day = daily.index[-1].date()
+    if hourly is not None and len(hourly):
+        idx = hourly.index.tz_localize("UTC") if hourly.index.tz is None else hourly.index
+        h_day = idx[-1].tz_convert(ET).date()
+        if h_day > d_day:
+            return _num(hourly.iloc[-1]), _num(daily.iloc[-1]), h_day
+    if len(daily) >= 2:
+        return _num(daily.iloc[-1]), _num(daily.iloc[-2]), d_day
+    return 0.0, 0.0, None
+
+
 def mid_price(row) -> float:
     bid, ask, last = _num(row.get("bid")), _num(row.get("ask")), _num(row.get("lastPrice"))
     if bid > 0 and ask > 0 and ask >= bid:
@@ -168,13 +191,16 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     out = {"symbol": sym, "tv": item.get("tv", sym), "name": item.get("name", sym), "pin": bool(item.get("pin"))}
     tk = yf.Ticker(sym)
 
-    # Price and previous close from the same daily history (as the heat map does).
-    # fast_info.previous_close can return the close from two sessions back after hours.
+    # Price and previous close from daily history, cross-checked against hourly bars
+    # (see last_and_prev). fast_info.previous_close can be two sessions stale after hours.
     price = prev = 0.0
     try:
-        closes = tk.history(period="5d", interval="1d", auto_adjust=False)["Close"].dropna()
-        if len(closes) >= 2:
-            price, prev = _num(closes.iloc[-1]), _num(closes.iloc[-2])
+        daily = tk.history(period="1mo", interval="1d", auto_adjust=False)["Close"]
+        try:
+            hourly = tk.history(period="5d", interval="60m", prepost=False, auto_adjust=False)["Close"]
+        except Exception:
+            hourly = None
+        price, prev, _ = last_and_prev(daily, hourly)
     except Exception:
         pass
     if price <= 0:
@@ -343,19 +369,23 @@ def build_heatmap(now: dt.datetime) -> None:
     holdings, weights_as_of = spy_weights()
     sectors = sp500_sectors()
     syms = [h[0] for h in holdings]
-    df = yf.download(syms, period="5d", interval="1d", auto_adjust=False, progress=False, threads=True)
+    df = yf.download(syms, period="1mo", interval="1d", auto_adjust=False, progress=False, threads=True)
     close = df["Close"]
+    try:   # hourly bars catch a newest session that the daily bars are missing (see last_and_prev)
+        hclose = yf.download(syms, period="5d", interval="60m", prepost=False, auto_adjust=False,
+                             progress=False, threads=True)["Close"]
+    except Exception as e:
+        print(f"heatmap: hourly cross-check unavailable ({e})", file=sys.stderr)
+        hclose = None
     stocks, as_of = [], None
     for sym, ssga_name, w in holdings:
         if sym not in close.columns:
             continue
-        col = close[sym].dropna()
-        if len(col) < 2:
-            continue
-        p, prev = float(col.iloc[-1]), float(col.iloc[-2])
+        hcol = hclose[sym] if hclose is not None and sym in hclose.columns else None
+        p, prev, day = last_and_prev(close[sym], hcol)
         if not (p > 0 and prev > 0):
             continue
-        as_of = max(as_of or col.index[-1], col.index[-1])
+        as_of = max(as_of or day, day)
         info = sectors.get(sym) or {}
         stocks.append({
             "s": sym,
