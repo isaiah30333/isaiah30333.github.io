@@ -62,5 +62,5 @@ window.SITE = {
   ],
 
   /* ---- Footer ---- */
-  footerNote: "Built from my site base."
+  footerNote: ""
 };

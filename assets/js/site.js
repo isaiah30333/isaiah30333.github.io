@@ -203,14 +203,10 @@
     void el.offsetWidth;   // commit the starting position so the very first roll animates
   }
 
-  // [hovered element, label inside it that rolls], across every page
+  // [hovered element, label inside it that rolls]. Kept to one place on purpose (minimal):
+  // the Home quick-facts labels. Add pairs here, or data-roll-host/data-roll, to use it elsewhere.
   var ROLL = [
-    [".facts > div", ".fact-k"],          // Home: quick-facts labels
-    [".card.project", ".tag"],            // Home: Work card tags
-    [".contact-row", ".contact-k"],       // Home: Email / LinkedIn labels
-    [".pin-card", ".pin-sym"],            // Markets: pinned ticker symbols
-    ["#em-table tbody tr", ".sym"],       // Markets: table ticker symbols
-    [".launch-tile", ".launch-name"],     // Launchpad: tool names
+    [".facts > div", ".fact-k"],
     ["[data-roll-host]", "[data-roll]"]
   ];
   var hostSel = ROLL.map(function (p) { return p[0]; }).join(",");
@@ -241,8 +237,35 @@
     document.addEventListener("focusout", onLeave);
   }
 
+  /* ---------- end of page: back to top + next tab ---------- */
+  function renderNextUp() {
+    var nav = S.nav || [];
+    var footer = document.getElementById("site-footer");
+    if (nav.length < 2 || !footer) return;
+    var i = 0;
+    nav.forEach(function (n, k) { if (n.href.split("#")[0].toLowerCase() === here) i = k; });
+    var next = nav[(i + 1) % nav.length];
+    var sec = document.createElement("section");
+    sec.className = "next-up";
+    sec.setAttribute("aria-label", "Next page");
+    sec.innerHTML =
+      '<div class="container next-inner">' +
+        '<button type="button" class="to-top"><span class="to-top-arrow" aria-hidden="true">↑</span>Back to top</button>' +
+        '<a class="next-link" href="' + esc(next.href) + '">' +
+          '<span class="eyebrow">Next</span>' +
+          '<span class="next-name">' + esc(next.label) + "</span>" +
+          '<span class="next-arrow" aria-hidden="true">→</span>' +
+        "</a>" +
+      "</div>";
+    footer.parentNode.insertBefore(sec, footer);
+    sec.querySelector(".to-top").addEventListener("click", function () {
+      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+    });
+  }
+
   function init() {
     renderHeader();
+    renderNextUp();
     renderFooter();
     fillPlaceholders();
     reveal();
