@@ -193,6 +193,11 @@
     var text = el.getAttribute("data-text");
     if (text == null) { text = el.textContent; el.setAttribute("data-text", text); el.setAttribute("aria-label", text); }
     if (el._raf) cancelAnimationFrame(el._raf);
+    else {
+      // lock the width while scrambling so proportional fonts don't make neighbors shift
+      el.style.minWidth = el.getBoundingClientRect().width + "px";
+      el.style.whiteSpace = "nowrap";
+    }
     var dur = 450, start = performance.now(), last = 0, out = text;
     function frame(now) {
       var p = Math.min(1, (now - start) / dur);
@@ -209,22 +214,35 @@
         el.textContent = out;
       }
       if (p < 1) el._raf = requestAnimationFrame(frame);
-      else { el.textContent = text; el._raf = null; }
+      else { el.textContent = text; el._raf = null; el.style.minWidth = ""; el.style.whiteSpace = ""; }
     }
     el._raf = requestAnimationFrame(frame);
   }
 
+  // [hovered element, label inside it that decodes], across every page.
+  // Delegated, so cards that pages re-draw on the fly (Markets, Launchpad) keep working.
+  var SCRAMBLE = [
+    [".facts > div", ".fact-k"],          // Home: quick-facts labels
+    [".card.project", ".tag"],            // Home: Work card tags
+    [".contact-row", ".contact-k"],       // Home: Email / LinkedIn labels
+    [".pin-card", ".pin-sym"],            // Markets: pinned ticker symbols
+    ["#em-table tbody tr", ".sym"],       // Markets: table ticker symbols
+    [".launch-tile", ".launch-name"],     // Launchpad: tool names
+    ["[data-scramble-host]", "[data-scramble]"]
+  ];
+  var hostSel = SCRAMBLE.map(function (p) { return p[0]; }).join(",");
+
+  function onEnter(e) {
+    var host = e.target.closest && e.target.closest(hostSel);
+    if (!host || (e.relatedTarget && host.contains(e.relatedTarget))) return;   // moving inside the same tile
+    for (var i = 0; i < SCRAMBLE.length; i++) {
+      if (host.matches(SCRAMBLE[i][0])) { scramble(host.querySelector(SCRAMBLE[i][1])); return; }
+    }
+  }
+
   function wireScramble() {
-    // [tile, label inside it]
-    var pairs = [[".facts > div", ".fact-k"], [".card.project", ".tag"], ["[data-scramble-host]", "[data-scramble]"]];
-    pairs.forEach(function (p) {
-      document.querySelectorAll(p[0]).forEach(function (host) {
-        var label = host.querySelector(p[1]);
-        if (!label) return;
-        host.addEventListener("mouseenter", function () { scramble(label); });
-        host.addEventListener("focusin", function () { scramble(label); });
-      });
-    });
+    document.addEventListener("mouseover", onEnter);
+    document.addEventListener("focusin", onEnter);
   }
 
   function init() {
