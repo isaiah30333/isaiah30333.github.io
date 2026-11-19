@@ -181,68 +181,64 @@
     items.forEach(function (i) { io.observe(i); });
   }
 
-  /* ---------- gibberish decode on hover ----------
-     Hovering a tile/card scrambles its small monospace label into random characters,
-     then decodes it left to right (~0.45s). Monospace keeps the width steady.
-     Add data-scramble to any element to opt it in; tiles below are wired by default. */
-  var GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$%#&@";
+  /* ---------- letter roll on hover ----------
+     Hovering a tile/card rolls its label: each letter slides up out of view while a
+     copy slides in from below, one letter after another (an odometer feel). It rolls
+     back when the pointer leaves. The label is split into letters the first time it's
+     hovered, so cards that pages re-draw on the fly (Markets, Launchpad) work too.
+     Add data-roll-host / data-roll to opt other elements in. CSS lives in base.css. */
   var reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function scramble(el) {
-    if (reduceMotion || !el) return;
-    var text = el.getAttribute("data-text");
-    if (text == null) { text = el.textContent; el.setAttribute("data-text", text); el.setAttribute("aria-label", text); }
-    if (el._raf) cancelAnimationFrame(el._raf);
-    else {
-      // lock the width while scrambling so proportional fonts don't make neighbors shift
-      el.style.minWidth = el.getBoundingClientRect().width + "px";
-      el.style.whiteSpace = "nowrap";
-    }
-    var dur = 450, start = performance.now(), last = 0, out = text;
-    function frame(now) {
-      var p = Math.min(1, (now - start) / dur);
-      if (now - last > 35 || p === 1) {                 // re-roll glyphs ~28×/s: crisp, not a blur
-        last = now;
-        var done = Math.floor(p * text.length);
-        out = "";
-        for (var i = 0; i < text.length; i++) {
-          var c = text[i];
-          if (i < done || !/[A-Za-z0-9]/.test(c)) { out += c; continue; }
-          var g = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-          out += c === c.toLowerCase() && c !== c.toUpperCase() ? g.toLowerCase() : g;   // keep each letter's case
-        }
-        el.textContent = out;
-      }
-      if (p < 1) el._raf = requestAnimationFrame(frame);
-      else { el.textContent = text; el._raf = null; el.style.minWidth = ""; el.style.whiteSpace = ""; }
-    }
-    el._raf = requestAnimationFrame(frame);
+  function splitRoll(el) {
+    if (!el || el.getAttribute("data-rolled")) return;
+    var text = el.textContent;
+    var letters = Array.prototype.map.call(text, function (c, i) {
+      var ch = c === " " ? "\u00a0" : esc(c);
+      // the letter stays in normal flow (so the text baseline never moves); its copy waits one line below
+      return '<span class="roll-ch" style="--i:' + i + '"><span class="roll-in">' + ch + '<span class="roll-copy">' + ch + "</span></span></span>";
+    }).join("");
+    // screen readers get the plain word; the animated letters are hidden from them
+    el.innerHTML = '<span class="sr-only">' + esc(text) + '</span><span class="roll" aria-hidden="true">' + letters + "</span>";
+    el.setAttribute("data-rolled", "1");
+    void el.offsetWidth;   // commit the starting position so the very first roll animates
   }
 
-  // [hovered element, label inside it that decodes], across every page.
-  // Delegated, so cards that pages re-draw on the fly (Markets, Launchpad) keep working.
-  var SCRAMBLE = [
+  // [hovered element, label inside it that rolls], across every page
+  var ROLL = [
     [".facts > div", ".fact-k"],          // Home: quick-facts labels
     [".card.project", ".tag"],            // Home: Work card tags
     [".contact-row", ".contact-k"],       // Home: Email / LinkedIn labels
     [".pin-card", ".pin-sym"],            // Markets: pinned ticker symbols
     ["#em-table tbody tr", ".sym"],       // Markets: table ticker symbols
     [".launch-tile", ".launch-name"],     // Launchpad: tool names
-    ["[data-scramble-host]", "[data-scramble]"]
+    ["[data-roll-host]", "[data-roll]"]
   ];
-  var hostSel = SCRAMBLE.map(function (p) { return p[0]; }).join(",");
+  var hostSel = ROLL.map(function (p) { return p[0]; }).join(",");
 
-  function onEnter(e) {
+  function rollHost(e) {
     var host = e.target.closest && e.target.closest(hostSel);
-    if (!host || (e.relatedTarget && host.contains(e.relatedTarget))) return;   // moving inside the same tile
-    for (var i = 0; i < SCRAMBLE.length; i++) {
-      if (host.matches(SCRAMBLE[i][0])) { scramble(host.querySelector(SCRAMBLE[i][1])); return; }
+    if (!host || (e.relatedTarget && host.contains(e.relatedTarget))) return null;   // moving within the same tile
+    return host;
+  }
+  function onEnter(e) {
+    if (reduceMotion) return;
+    var host = rollHost(e);
+    if (!host) return;
+    for (var i = 0; i < ROLL.length; i++) {
+      if (host.matches(ROLL[i][0])) { splitRoll(host.querySelector(ROLL[i][1])); break; }
     }
+    host.classList.add("is-rolled");
+  }
+  function onLeave(e) {
+    var host = rollHost(e);
+    if (host) host.classList.remove("is-rolled");
   }
 
-  function wireScramble() {
+  function wireRoll() {
     document.addEventListener("mouseover", onEnter);
+    document.addEventListener("mouseout", onLeave);
     document.addEventListener("focusin", onEnter);
+    document.addEventListener("focusout", onLeave);
   }
 
   function init() {
@@ -250,7 +246,7 @@
     renderFooter();
     fillPlaceholders();
     reveal();
-    wireScramble();
+    wireRoll();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
