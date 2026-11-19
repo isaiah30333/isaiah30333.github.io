@@ -1,0 +1,31 @@
+{
+  "_comment": "Summit Fund Market chart (Macro + Sectors buttons). 'symbol' matches the button's short name in the Summit site's content.js. 'yahoo' = Yahoo symbol for price/candles. 'options' = ticker whose options give the implied volatility when the symbol has none (an ETF stand-in). 'noOptions' = candles only. 'ivFrom: monthly' = use the monthly expiry's volatility for every horizon (thin option chains).",
+  "tickers": [
+    { "symbol": "SPY",   "name": "S&P 500 ETF" },
+    { "symbol": "QQQ",   "name": "Nasdaq 100 ETF" },
+    { "symbol": "SPX",   "yahoo": "^GSPC",    "options": "^SPX", "name": "S&P 500" },
+    { "symbol": "DJI",   "yahoo": "^DJI",     "options": "^DJX", "name": "Dow 30" },
+    { "symbol": "RUT",   "yahoo": "^RUT",     "name": "Russell 2000" },
+    { "symbol": "VIX",   "yahoo": "^VIX",     "name": "Volatility" },
+    { "symbol": "US10Y", "yahoo": "^TNX",     "noOptions": true, "name": "10Y Yield" },
+    { "symbol": "WTI",   "yahoo": "CL=F",     "options": "USO",  "name": "Crude Oil" },
+    { "symbol": "GOLD",  "yahoo": "GC=F",     "options": "GLD",  "name": "Gold" },
+    { "symbol": "DXY",   "yahoo": "DX-Y.NYB", "options": "UUP",  "ivFrom": "monthly", "name": "US Dollar" },
+    { "symbol": "BTC",   "yahoo": "BTC-USD",  "options": "IBIT", "name": "Bitcoin" },
+    { "symbol": "NI225", "yahoo": "^N225",    "options": "EWJ",  "ivFrom": "monthly", "name": "Nikkei 225" },
+    { "symbol": "DAX",   "yahoo": "^GDAXI",   "options": "EWG",  "ivFrom": "monthly", "name": "Germany 40" },
+    { "symbol": "UK100", "yahoo": "^FTSE",    "options": "EWU",  "ivFrom": "monthly", "name": "FTSE 100" },
+    { "symbol": "HK50",  "yahoo": "^HSI",     "options": "EWH",  "ivFrom": "monthly", "name": "Hang Seng" },
+    { "symbol": "XLK",   "name": "Technology" },
+    { "symbol": "XLC",   "name": "Communication Services" },
+    { "symbol": "XLY",   "name": "Consumer Discretionary" },
+    { "symbol": "XLP",   "name": "Consumer Staples" },
+    { "symbol": "XLF",   "name": "Financials" },
+    { "symbol": "XLV",   "name": "Health Care" },
+    { "symbol": "XLI",   "name": "Industrials" },
+    { "symbol": "XLE",   "name": "Energy" },
+    { "symbol": "XLU",   "name": "Utilities" },
+    { "symbol": "XLRE",  "name": "Real Estate" },
+    { "symbol": "XLB",   "name": "Materials" }
+  ]
+}

@@ -3,6 +3,15 @@ Compute daily and weekly expected moves for the tickers in data/watchlist.json
 and write them to data/expected-moves.json (+ a .js copy so the page also
 works when opened straight from disk).
 
+A second set, data/summit-watchlist.json -> data/summit/, feeds the Summit Fund
+site's Market chart (indexes, macro and sector ETFs). Watchlist entries can set:
+  "yahoo":     Yahoo symbol for price/candles when it differs from "symbol" (^GSPC)
+  "options":   take implied volatility from another ticker's options (GLD for gold,
+               ^DJX for the Dow). Volatility is a %, so it carries over to the index.
+  "noOptions": true when nothing suitable is listed: candles only, no expected move.
+  "ivFrom":    "monthly" to use the monthly expiry's volatility for every horizon
+               (for thin option chains where short-dated quotes are unreliable).
+
 Method
 ------
 Expected move (1 standard deviation) = price x IV x sqrt(time)
@@ -34,11 +43,16 @@ from zoneinfo import ZoneInfo
 import yfinance as yf
 
 ROOT = Path(__file__).resolve().parent.parent
-WATCHLIST = ROOT / "data" / "watchlist.json"
-OUT_JSON = ROOT / "data" / "expected-moves.json"
-OUT_JS = ROOT / "data" / "expected-moves.js"
-BARS_DIR = ROOT / "data" / "bars"          # one candle file per ticker, loaded when it's charted
 ET = ZoneInfo("America/New_York")
+
+# (watchlist, output json, optional .js copy, candle folder). The first set is this site's
+# Markets page; a failure there is what makes the run fail.
+SETS = [
+    (ROOT / "data" / "watchlist.json", ROOT / "data" / "expected-moves.json",
+     ROOT / "data" / "expected-moves.js", ROOT / "data" / "bars"),
+    (ROOT / "data" / "summit-watchlist.json", ROOT / "data" / "summit" / "expected-moves.json",
+     None, ROOT / "data" / "summit" / "bars"),
+]
 
 # chart key -> (yfinance interval, history period, sessions to keep or None for all)
 # 3m and 4h candles are built in the browser from the 1m and 1h data.
@@ -186,14 +200,9 @@ def fetch_bars(tk: yf.Ticker, interval: str, period: str, sessions) -> list:
     return rows
 
 
-def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
-    today = now.date()
-    sym = item["symbol"]
-    out = {"symbol": sym, "tv": item.get("tv", sym), "name": item.get("name", sym), "pin": bool(item.get("pin"))}
-    tk = yf.Ticker(sym)
-
-    # Price and previous close from daily history, cross-checked against hourly bars
-    # (see last_and_prev). fast_info.previous_close can be two sessions stale after hours.
+def price_of(tk: yf.Ticker) -> tuple[float, float]:
+    """(price, previous close) from daily history, cross-checked against hourly bars
+    (see last_and_prev). fast_info.previous_close can be two sessions stale after hours."""
     price = prev = 0.0
     try:
         daily = tk.history(period="1mo", interval="1d", auto_adjust=False)["Close"]
@@ -208,13 +217,49 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
         fi = tk.fast_info
         price = _num(getattr(fi, "last_price", None))
         prev = _num(getattr(fi, "previous_close", None))
+    return price, prev
+
+
+def all_bars(tk: yf.Ticker, sym: str) -> dict:
+    """Candles for the chart, every interval. Optional: the chart falls back if missing."""
+    bars = {}
+    for key, (interval, period, sessions) in BAR_SPECS.items():
+        try:
+            bars[key] = fetch_bars(tk, interval, period, sessions)
+        except Exception as e:
+            print(f"     {sym}: no {key} bars ({e})", file=sys.stderr)
+    return bars
+
+
+def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
+    today = now.date()
+    sym = item["symbol"]
+    out = {"symbol": sym, "tv": item.get("tv", sym), "name": item.get("name", sym), "pin": bool(item.get("pin"))}
+    tk = yf.Ticker(item.get("yahoo", sym))
+
+    price, prev = price_of(tk)
     if price <= 0:
         raise ValueError("no price")
     out["price"] = round(price, 4 if price < 5 else 2)
     out["prevClose"] = round(prev, 4 if prev < 5 else 2) if prev else None
     out["changePct"] = round((price / prev - 1) * 100, 2) if prev else None
 
-    exps = [(e, dt.date.fromisoformat(e)) for e in tk.options]
+    if item.get("noOptions"):                      # e.g. the 10-year yield: chart only
+        out["noOptions"] = True
+        out["_bars"] = all_bars(tk, sym)
+        return out
+
+    # Options can come from a stand-in (GLD for gold). IV is read off the stand-in's own
+    # at-the-money straddle at the stand-in's price, then applied to this symbol's price.
+    otk, oprice = tk, price
+    if item.get("options"):
+        otk = yf.Ticker(item["options"])
+        oprice, _ = price_of(otk)
+        if oprice <= 0:
+            raise ValueError(f"no price for {item['options']}")
+        out["emVia"] = item["options"]
+
+    exps = [(e, dt.date.fromisoformat(e)) for e in otk.options]
     exps = [(e, d) for e, d in exps if d >= sess]
     if not exps:
         raise ValueError("no listed options")
@@ -223,7 +268,7 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     friday = sess + dt.timedelta(days=(4 - sess.weekday()))
     in_week = [x for x in exps if x[1] <= friday]
     w_exp, w_date = in_week[-1] if in_week else exps[0]
-    w_iv, w_straddle = atm_snapshot(tk, w_exp, price, w_date, now)
+    w_iv, w_straddle = atm_snapshot(otk, w_exp, oprice, w_date, now)
 
     # --- daily: nearest expiry after the session day (avoids noisy 0DTE IV)
     later = [x for x in exps if x[1] > sess]
@@ -231,7 +276,7 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     if (d_exp, d_date) == (w_exp, w_date):
         d_iv = w_iv
     else:
-        d_iv, _ = atm_snapshot(tk, d_exp, price, d_date, now)
+        d_iv, _ = atm_snapshot(otk, d_exp, oprice, d_date, now)
     d_iv = d_iv or w_iv
     w_iv = w_iv or d_iv
     if not d_iv:
@@ -245,7 +290,7 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     out["daily"] = move_block(d_anchor, d_iv, 1 / 252, 1, sess.isoformat(), ivExpiry=d_exp)
     out["weekly"] = move_block(
         price, w_iv, years_to_expiry(w_date, now), trading_days(sess, w_date), w_exp,
-        straddle=round(w_straddle, 4 if price < 5 else 2) if w_straddle else None,
+        straddle=round(w_straddle, 4 if price < 5 else 2) if w_straddle and otk is tk else None,
         isWeekly=bool(in_week),
     )
 
@@ -255,22 +300,21 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     after_week = [x for x in exps if x[1] > w_date]
     monthlies = [x for x in after_week if is_monthly(x[1])]
     m_exp, m_date = monthlies[0] if monthlies else (after_week[0] if after_week else (w_exp, w_date))
-    m_iv, m_straddle = atm_snapshot(tk, m_exp, price, m_date, now)
+    m_iv, m_straddle = atm_snapshot(otk, m_exp, oprice, m_date, now)
     m_iv = m_iv or w_iv
     out["monthly"] = move_block(
         price, m_iv, years_to_expiry(m_date, now), trading_days(sess, m_date), m_exp,
-        straddle=round(m_straddle, 4 if price < 5 else 2) if m_straddle else None,
+        straddle=round(m_straddle, 4 if price < 5 else 2) if m_straddle and otk is tk else None,
         isMonthly=bool(monthlies),
     )
+    # Thin option chains (small foreign / currency ETFs): next-day and weekly quotes are too
+    # wide to trust, so every horizon uses the monthly expiry's volatility.
+    if item.get("ivFrom") == "monthly" and m_iv:
+        out["daily"] = move_block(d_anchor, m_iv, 1 / 252, 1, sess.isoformat(), ivExpiry=m_exp)
+        out["weekly"] = move_block(price, m_iv, years_to_expiry(w_date, now), trading_days(sess, w_date), w_exp,
+                                   straddle=None, isWeekly=bool(in_week))
 
-    # Candles for the chart, every interval. Optional: the chart falls back if missing.
-    bars = {}
-    for key, (interval, period, sessions) in BAR_SPECS.items():
-        try:
-            bars[key] = fetch_bars(tk, interval, period, sessions)
-        except Exception as e:
-            print(f"     {sym}: no {key} bars ({e})", file=sys.stderr)
-    out["_bars"] = bars
+    out["_bars"] = all_bars(tk, sym)
     return out
 
 
@@ -410,11 +454,9 @@ def build_heatmap(now: dt.datetime) -> None:
 
 
 # ---------------------------------------------------------------- main
-def main() -> int:
-    items = json.loads(WATCHLIST.read_text(encoding="utf-8"))["tickers"]
-    now = dt.datetime.now(ET)
-    sess = session_date(now)
-
+def run_set(watchlist: Path, out_json: Path, out_js, bars_dir: Path, now: dt.datetime, sess: dt.date) -> bool:
+    """Expected moves + candle files for one watchlist. False if every ticker failed."""
+    items = json.loads(watchlist.read_text(encoding="utf-8"))["tickers"]
     results, failed = [], 0
     for item in items:
         try:
@@ -428,15 +470,15 @@ def main() -> int:
         time.sleep(0.4)
 
     if failed == len(items):
-        print("Every ticker failed. Keeping the previous data file.", file=sys.stderr)
-        return 1
+        print(f"{watchlist.name}: every ticker failed. Keeping the previous data file.", file=sys.stderr)
+        return False
 
-    # candle files: data/bars/<SYMBOL>.json, fetched by the page only for the charted symbol
-    BARS_DIR.mkdir(parents=True, exist_ok=True)
+    # candle files: <bars_dir>/<SYMBOL>.json, fetched by the page only for the charted symbol
+    bars_dir.mkdir(parents=True, exist_ok=True)
     for r in results:
         bars = r.pop("_bars", None)
         if bars and any(bars.values()):
-            (BARS_DIR / f"{r['symbol']}.json").write_text(
+            (bars_dir / f"{r['symbol']}.json").write_text(
                 json.dumps({"symbol": r["symbol"], "generatedAt": now.isoformat(timespec="seconds"), "bars": bars},
                            separators=(",", ":")), encoding="utf-8")
 
@@ -450,16 +492,35 @@ def main() -> int:
     }
     # compact: the page downloads this every few minutes, and the candles make it large
     text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-    OUT_JSON.write_text(text + "\n", encoding="utf-8")
-    OUT_JS.write_text("window.EXPECTED_MOVES = " + text + ";\n", encoding="utf-8")
-    print(f"Wrote {len(results) - failed}/{len(items)} tickers for session {sess}")
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_json.write_text(text + "\n", encoding="utf-8")
+    if out_js:
+        out_js.write_text("window.EXPECTED_MOVES = " + text + ";\n", encoding="utf-8")
+    print(f"{watchlist.name}: wrote {len(results) - failed}/{len(items)} tickers for session {sess}")
+    return True
+
+
+def main() -> int:
+    now = dt.datetime.now(ET)
+    sess = session_date(now)
+    ok = True
+    for i, (wl, oj, ojs, bd) in enumerate(SETS):
+        if not wl.exists():
+            continue
+        try:
+            good = run_set(wl, oj, ojs, bd, now, sess)
+        except Exception as e:
+            print(f"{wl.name}: skipped ({e})", file=sys.stderr)
+            good = False
+        if i == 0 and not good:
+            ok = False                              # only this site's own watchlist fails the run
 
     # S&P 500 heat map: separate, so a problem here never blocks the expected moves
     try:
         build_heatmap(now)
     except Exception as e:
         print(f"heatmap: skipped ({e})", file=sys.stderr)
-    return 0
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
