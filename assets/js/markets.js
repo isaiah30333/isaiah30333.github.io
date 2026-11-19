@@ -475,20 +475,6 @@
     candles.update(Object.assign({}, lastBar));
   }
 
-  var tapeKey = "";
-  function renderTape() {
-    if (S.tickerTape === false) return;
-    var host = document.getElementById("tv-tape");
-    var theme = isDark() ? "dark" : "light";
-    if (theme === tapeKey) return;
-    tapeKey = theme;
-    host.hidden = false;
-    tvEmbed(host, "embed-widget-ticker-tape.js", {
-      symbols: tickers().map(function (t) { return { proName: t.tv, title: t.symbol }; }),
-      showSymbolLogo: true, isTransparent: true, displayMode: "adaptive",
-      colorTheme: theme, locale: "en"
-    });
-  }
 
   function select(sym, scroll) {
     state.symbol = sym;
@@ -640,7 +626,7 @@
     if (tr) select(tr.getAttribute("data-sym"), true);
   });
 
-  function onTheme() { if (state.data) { renderChart(); renderTape(); } }
+  function onTheme() { if (state.data) renderChart(); }
   new MutationObserver(onTheme).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onTheme);
 
@@ -667,7 +653,6 @@
     renderMeta();
     render();
     renderChart();
-    renderTape();
 
     // live prices
     fetchQuotes();

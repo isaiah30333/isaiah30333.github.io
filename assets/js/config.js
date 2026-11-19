@@ -46,7 +46,12 @@ window.SITE = {
      fine for a free key, but don't use a paid one here. Set to "" to turn live prices off. */
   finnhubKey: "dbukeh9r01qv51jc580gdbukeh9r01qv51jc5810",
   liveQuoteRefreshSeconds: 60,   // backup refresh; the websocket streams trades in between
-  tickerTape: true,              // scrolling TradingView price bar on the Markets page
+  // Live price band under the header on every page (TradingView symbols). Set to [] to hide it.
+  tickerTape: [
+    "AMEX:SPY", "NASDAQ:QQQ", "NASDAQ:NVDA", "NASDAQ:AMD", "NASDAQ:AAPL", "NASDAQ:MSFT", "NASDAQ:AMZN",
+    "NASDAQ:GOOG", "NASDAQ:META", "NASDAQ:AVGO", "NASDAQ:TSLA", "NYSE:BRK.B", "NYSE:JPM", "NYSE:BAC",
+    "NYSE:CCL", "NYSE:BE", "NASDAQ:PDSB"
+  ],
 
   /* ---- Launchpad tiles (launchpad.html) ----
      Number keys 1–9 open tiles in order.
