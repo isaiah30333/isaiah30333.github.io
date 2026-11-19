@@ -437,7 +437,7 @@ code { border-bottom-width: 1px; }
 .view-seg { margin-left: auto; }                         /* Overview / Technicals */
 .lg.ta-vwap { color: #7c5cd6; } .lg.ta-ema { color: #2f80ed; } .lg.ta-sma { color: #e08a1e; } .lg.ta-bb { color: #0d9488; } .lg.ta-vol { color: var(--text-muted); }
 .chart-tv:hover { color: var(--text); }
-.tv-chart { height: clamp(340px, 55vh, 560px); }
+.tv-chart { height: clamp(420px, 68vh, 700px); }
 
 .table-card { padding: 0; overflow: hidden; }
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }

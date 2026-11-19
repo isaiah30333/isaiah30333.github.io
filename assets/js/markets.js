@@ -496,7 +496,9 @@
       autosize: true, symbol: t.tv, interval: TV_IV[state.iv] || "D", timezone: "America/New_York",
       theme: theme, style: "1", locale: "en",
       backgroundColor: theme === "dark" ? "rgba(22,21,17,1)" : "rgba(255,255,255,1)",
-      hide_side_toolbar: true, allow_symbol_change: true, calendar: false,
+      // full TradingView toolbars: Indicators menu on top, drawing tools on the left
+      hide_top_toolbar: false, hide_side_toolbar: false, withdateranges: true,
+      allow_symbol_change: true, calendar: false,
       support_host: "https://www.tradingview.com",
       hide_volume: state.view !== "technicals",
       studies: state.view === "technicals" ? [
@@ -527,11 +529,13 @@
         '</span> – <span class="up">' + money(b.high) + '</span> <span class="muted">· exp ' + esc(fmtDate(b.expiry)) + "</span>"
       : (t.extra ? '<span class="muted">Chart only · expected moves cover the watchlist</span>' : "");
 
-    var my = ++chartReq;
-    loadBars(t.symbol).then(function (bars) {
-      if (my !== chartReq) return;   // the user already picked something else
-      drawChart(t, b, bars && bars[IV[state.iv].src], theme);
-    });
+    // TradingView's live chart for every symbol. The expected-move range stays in the bar above.
+    ++chartReq;
+    renderTVChart(document.getElementById("tv-chart"), t, theme);
+    var lg = document.getElementById("chart-legend");
+    if (lg) lg.innerHTML = state.view === "technicals"
+      ? '<span class="lg">Volume · VWAP · EMA 50 · SMA 50 · BB 20, 2</span>'
+      : "";
   }
 
   function drawChart(t, b, rows, theme) {
