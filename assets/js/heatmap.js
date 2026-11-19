@@ -26,9 +26,8 @@
 
   var BG = "#0c0b10";
   var LABEL_H = 18;          // sector label strip
-  var GAP = 2;               // space between sectors
-  var SEAM = "rgba(12,11,16,.22)";   // faint line where neighboring cells meet (no black gaps)
-  var SWELL = 0.04;          // hovered cell grows this much over its neighbors
+  var GAP = 3;               // space between sectors
+  var INSET = 0.94;          // resting gap between cells
   var SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
 
   // wake physics
@@ -149,7 +148,7 @@
   }
 
   function cellPath(g, c, now, moving) {
-    var k = c === hover ? 1 + SWELL * c.glow : 1;    // cells meet edge to edge; the hovered one swells
+    var k = INSET + (1 - INSET) * c.glow;            // gaps close as a cell lights up
     var off = moving ? wake(c.cx, c.cy, now) : [0, 0];
     var ccx = c.cx + off[0], ccy = c.cy + off[1];
     g.beginPath();
@@ -167,9 +166,7 @@
     var center = cellPath(g, c, now, moving);
     g.fillStyle = rgb(c.color, 0.22 * c.glow);
     g.fill();
-    if (c === hover) { g.lineWidth = 1.5; g.strokeStyle = "rgba(255,255,255,.85)"; }
-    else { g.lineWidth = 1; g.strokeStyle = SEAM; }
-    g.stroke();
+    if (c === hover) { g.lineWidth = 1.5; g.strokeStyle = "rgba(255,255,255,.85)"; g.stroke(); }
     if (!c.label) return;
     g.save();
     g.clip();
@@ -225,11 +222,17 @@
     x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W, x1); y1 = Math.min(H, y1);
     if (x1 <= x0 || y1 <= y0) return;
 
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Snap the repaint area to whole device pixels. A fractional edge gets anti-aliased,
+    // blending the old and new drawing into a faint dark box that follows the cursor.
+    var X0 = Math.floor(x0 * dpr), Y0 = Math.floor(y0 * dpr);
+    var X1 = Math.ceil(x1 * dpr), Y1 = Math.ceil(y1 * dpr);
     ctx.save();
-    ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath(); ctx.rect(X0, Y0, X1 - X0, Y1 - Y0); ctx.clip();
     ctx.fillStyle = BG;
-    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x0 = X0 / dpr; y0 = Y0 / dpr; x1 = X1 / dpr; y1 = Y1 / dpr;
     var hov = null;
     cells.forEach(function (c) {
       if (c.x1 < x0 - 40 || c.x0 > x1 + 40 || c.y1 < y0 - 40 || c.y0 > y1 + 40) return;
