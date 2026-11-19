@@ -164,7 +164,7 @@ def move_block(anchor: float, iv: float, years: float, days: int, expiry: str, *
 
 
 def fetch_bars(tk: yf.Ticker, interval: str, period: str, sessions) -> list:
-    """Candles as [time, open, high, low, close].
+    """Candles as [time, open, high, low, close, volume].
     `time` is New York wall-clock time encoded as UTC seconds, so the chart's
     time axis reads in ET without any timezone handling in the browser.
     `sessions` keeps only the last N trading days (None keeps everything)."""
@@ -176,12 +176,13 @@ def fetch_bars(tk: yf.Ticker, interval: str, period: str, sessions) -> list:
     dates = sorted({ts.date() for ts in idx})
     keep = set(dates if sessions is None else dates[-sessions:])
     rows = []
-    for ts, (o, hi, lo, c) in zip(idx, h[["Open", "High", "Low", "Close"]].itertuples(index=False, name=None)):
+    vol = h["Volume"] if "Volume" in h else [0] * len(h)
+    for ts, (o, hi, lo, c), v in zip(idx, h[["Open", "High", "Low", "Close"]].itertuples(index=False, name=None), vol):
         if ts.date() not in keep or any(v != v for v in (o, hi, lo, c)):  # v != v → NaN
             continue
         nd = 4 if c < 5 else 2
         t = calendar.timegm(ts.replace(tzinfo=None).timetuple())
-        rows.append([t, round(o, nd), round(hi, nd), round(lo, nd), round(c, nd)])
+        rows.append([t, round(o, nd), round(hi, nd), round(lo, nd), round(c, nd), int(v) if v == v else 0])
     return rows
 
 

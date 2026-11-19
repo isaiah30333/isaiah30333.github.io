@@ -4,7 +4,7 @@
   var esc = window.SiteUtil.esc;
   var root = document.documentElement;
   // tf = expected-move horizon (daily | weekly | monthly); iv = chart candle interval
-  var state = { tf: "daily", iv: "15m", sort: null, dir: 1, data: null, symbol: null, extra: null };
+  var state = { tf: "daily", iv: "15m", view: "overview", sort: null, dir: 1, data: null, symbol: null, extra: null };
   var live = {};          // yahoo symbol -> { price, pc }
   var fhToSym = {};       // finnhub symbol -> yahoo symbol
   var feed = "off";       // off | connecting | live | closed | error
@@ -287,6 +287,8 @@
      Falls back to the TradingView widget if the library or the candle file is missing. */
   var LW = window.LightweightCharts;
   var chart = null, candles = null, emLines = [], em = { lo: null, hi: null };
+  var ta = null;                                    // technicals: volume + VWAP / EMA 50 / SMA 50 series
+  var TA_COLORS = { vwap: "#7c5cd6", ema: "#2f80ed", sma: "#e08a1e" };
   var lastBar = null, chartMode = "", chartKey = "", chartReq = 0, barCache = {};
 
   // interval key -> source candles in the data file, bucket rule, how many candles to show at first
@@ -336,8 +338,9 @@
         cur.high = Math.max(cur.high, r[2]);
         cur.low = Math.min(cur.low, r[3]);
         cur.close = r[4];
+        cur.volume += r[5] || 0;
       } else {
-        cur = { time: t, open: r[1], high: r[2], low: r[3], close: r[4] };
+        cur = { time: t, open: r[1], high: r[2], low: r[3], close: r[4], volume: r[5] || 0 };
         out.push(cur);
       }
     });
@@ -352,6 +355,85 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
       .then(function (d) { barCache[sym] = d && d.bars ? d.bars : null; return barCache[sym]; });
+  }
+
+  /* ---------- technicals: the math ---------- */
+  function sma(data, n) {
+    var out = [], sum = 0;
+    for (var i = 0; i < data.length; i++) {
+      sum += data[i].close;
+      if (i >= n) sum -= data[i - n].close;
+      if (i >= n - 1) out.push({ time: data[i].time, value: sum / n });
+    }
+    return out;
+  }
+  function ema(data, n) {                           // seeded with the first n-bar average
+    var out = [], k = 2 / (n + 1), e = 0;
+    for (var i = 0; i < data.length; i++) {
+      if (i < n) { e += data[i].close / n; if (i === n - 1) out.push({ time: data[i].time, value: e }); continue; }
+      e = data[i].close * k + e * (1 - k);
+      out.push({ time: data[i].time, value: e });
+    }
+    return out;
+  }
+  // Intraday: VWAP restarts every session (the standard). Daily / weekly bars: a rolling
+  // 20-bar VWAP, since a one-day anchor on a daily chart would just trace each candle.
+  function vwap(data, intraday) {
+    var out = [], pv = 0, vv = 0, day = null, win = [];
+    data.forEach(function (b) {
+      var tp = (b.high + b.low + b.close) / 3, v = b.volume || 0;
+      if (intraday) {
+        var d = Math.floor(b.time / 86400);
+        if (d !== day) { day = d; pv = 0; vv = 0; }
+        pv += tp * v; vv += v;
+      } else {
+        win.push([tp * v, v]); pv += tp * v; vv += v;
+        if (win.length > 20) { var o = win.shift(); pv -= o[0]; vv -= o[1]; }
+      }
+      if (vv > 0) out.push({ time: b.time, value: pv / vv });
+    });
+    return out;
+  }
+  function alpha(hex, a) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+    if (!m) return hex;
+    var n = parseInt(m[1], 16);
+    return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  }
+  function line(color, title) {
+    return chart.addLineSeries({ color: color, lineWidth: 2, title: title, priceLineVisible: false,
+      lastValueVisible: true, crosshairMarkerVisible: false });
+  }
+  function ensureTA() {
+    if (ta) return;
+    ta = {
+      vol: chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false }),
+      vwap: line(TA_COLORS.vwap, "VWAP"),
+      ema: line(TA_COLORS.ema, "EMA 50"),
+      sma: line(TA_COLORS.sma, "SMA 50")
+    };
+    chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+  }
+  function drawTA(data, intraday) {
+    var on = state.view === "technicals";
+    candles.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: on ? 0.24 : 0.08 } });
+    if (!on) { if (ta) Object.keys(ta).forEach(function (k) { ta[k].setData([]); }); return; }
+    ensureTA();
+    var hasVol = data.some(function (b) { return b.volume > 0; });
+    var up = alpha(cssVar("--up"), 0.45), down = alpha(cssVar("--down"), 0.45);
+    ta.vol.setData(hasVol ? data.map(function (b) { return { time: b.time, value: b.volume, color: b.close >= b.open ? up : down }; }) : []);
+    ta.vwap.applyOptions({ title: intraday ? "VWAP" : "VWAP 20" });
+    ta.vwap.setData(hasVol ? vwap(data, intraday) : []);
+    ta.ema.setData(ema(data, 50));
+    ta.sma.setData(sma(data, 50));
+  }
+  function renderLegend(intraday) {
+    var el = document.getElementById("chart-legend");
+    if (!el) return;
+    el.innerHTML = state.view === "technicals"
+      ? '<span class="lg ta-vol">▮ Volume</span> <span class="lg ta-vwap">— ' + (intraday ? "VWAP" : "VWAP 20") +
+        '</span> <span class="lg ta-ema">— EMA 50</span> <span class="lg ta-sma">— SMA 50</span>'
+      : '<span class="lg up">- - EM high</span> <span class="lg down">- - EM low</span> <span class="lg">··· center</span>';
   }
 
   function chartTheme(intraday) {
@@ -369,7 +451,7 @@
 
   function dropLW() {
     if (chart) chart.remove();
-    chart = candles = null; emLines = []; lastBar = null;
+    chart = candles = ta = null; emLines = []; lastBar = null;
   }
 
   function ensureLW(host) {
@@ -399,7 +481,13 @@
       theme: theme, style: "1", locale: "en",
       backgroundColor: theme === "dark" ? "rgba(22,21,17,1)" : "rgba(255,255,255,1)",
       hide_side_toolbar: true, allow_symbol_change: true, calendar: false,
-      support_host: "https://www.tradingview.com"
+      support_host: "https://www.tradingview.com",
+      hide_volume: state.view !== "technicals",
+      studies: state.view === "technicals" ? [
+        { id: "VWAP@tv-basicstudies" },
+        { id: "MAExp@tv-basicstudies", inputs: { length: 50 } },
+        { id: "MASimple@tv-basicstudies", inputs: { length: 50 } }
+      ] : []
     });
   }
 
@@ -407,7 +495,7 @@
     var t = chartTicker();
     if (!t) return;
     var theme = isDark() ? "dark" : "light";
-    var key = [t.symbol, state.tf, state.iv, theme, state.data.generatedAt].join("|");
+    var key = [t.symbol, state.tf, state.iv, state.view, theme, state.data.generatedAt].join("|");
     if (key === chartKey) return;
     chartKey = key;
 
@@ -439,12 +527,15 @@
     var up = cssVar("--up"), down = cssVar("--down");
     candles.applyOptions({ upColor: up, downColor: down, wickUpColor: up, wickDownColor: down });
 
-    var data = toCandles(rows, state.iv);
+    var full = toCandles(rows, state.iv);
+    var data = full.map(function (b) { return { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close }; });
+    renderLegend(!c.day && !c.week);
     emLines.forEach(function (l) { candles.removePriceLine(l); });
     emLines = [];
     em.lo = b.high != null ? b.low : null;
     em.hi = b.high != null ? b.high : null;
     candles.setData(data);
+    drawTA(full, !c.day && !c.week);
     lastBar = Object.assign({}, data[data.length - 1]);
 
     if (b.high != null) {
@@ -607,6 +698,21 @@
     });
   });
 
+  // chart view: overview (candles + expected moves) / technicals (volume, VWAP, EMA 50, SMA 50)
+  function markView() {
+    document.querySelectorAll("#view-seg [data-view]").forEach(function (x) {
+      x.setAttribute("aria-pressed", x.getAttribute("data-view") === state.view ? "true" : "false");
+    });
+  }
+  document.querySelectorAll("#view-seg [data-view]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.view = b.getAttribute("data-view");
+      markView();
+      try { localStorage.setItem("em-view", state.view); } catch (e) {}
+      renderChart();
+    });
+  });
+
   document.querySelectorAll("#em-table th[data-sort]").forEach(function (th) {
     th.addEventListener("click", function () {
       var k = th.getAttribute("data-sort");
@@ -636,11 +742,13 @@
     if (saved === "daily" || saved === "weekly" || saved === "monthly") state.tf = saved;
     var savedIv = localStorage.getItem("em-iv");
     if (savedIv && IV[savedIv]) state.iv = savedIv;
+    if (localStorage.getItem("em-view") === "technicals") state.view = "technicals";
   } catch (e) {}
   document.querySelectorAll("#tf-seg button").forEach(function (x) {
     x.setAttribute("aria-selected", x.getAttribute("data-tf") === state.tf ? "true" : "false");
   });
   markIv();
+  markView();
 
   loadData().then(function (d) {
     if (!d || !d.tickers) {
