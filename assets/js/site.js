@@ -71,7 +71,7 @@
     var theme = dark ? "dark" : "light";
     if (theme === tapeTheme) return;                  // only re-embed when the colors change
     tapeTheme = theme;
-    host.innerHTML = '<div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div>';
+    host.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
     var s = document.createElement("script");
     s.src = "https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";
     s.async = true;
