@@ -7,11 +7,11 @@
   <meta name="description" content="Daily and weekly expected moves for SPY, QQQ and the largest S&amp;P 500 companies, based on options implied volatility.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/base.css?v=20261119f">
-  <link rel="stylesheet" href="assets/css/pages.css?v=20261119f">
-  <link rel="stylesheet" href="assets/css/drawer.css?v=20261119f">
-  <script src="assets/js/config.js?v=20261119f"></script>
-  <script src="assets/js/site.js?v=20261119f"></script>
+  <link rel="stylesheet" href="assets/css/base.css?v=20261119g">
+  <link rel="stylesheet" href="assets/css/pages.css?v=20261119g">
+  <link rel="stylesheet" href="assets/css/drawer.css?v=20261119g">
+  <script src="assets/js/config.js?v=20261119g"></script>
+  <script src="assets/js/site.js?v=20261119g"></script>
   <!-- TradingView's open-source charting library: draws the expected-move lines on the chart -->
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
   <!-- d3 pieces for the S&P 500 heat map: Voronoi cells + squarified sector layout -->
@@ -112,6 +112,18 @@
       <p class="heat-note muted small">Cell size = weight in the S&amp;P 500, color = today's change. Hover for details; click to open the chart.</p>
     </section>
 
+    <!-- top stories + economic calendar (TradingView) -->
+    <div class="feeds" id="feeds">
+      <section class="feed card" aria-label="Top stories">
+        <div class="chart-bar"><div class="chart-title"><strong>Top stories</strong> <span class="muted small">Market news</span></div></div>
+        <div class="feed-body" id="feed-news"></div>
+      </section>
+      <section class="feed card" aria-label="Economic calendar">
+        <div class="chart-bar"><div class="chart-title"><strong>Economic calendar</strong> <span class="muted small">U.S. · medium &amp; high impact</span></div></div>
+        <div class="feed-body" id="feed-cal"></div>
+      </section>
+    </div>
+
     <p class="fineprint muted">
       Expected move = price × implied volatility × √time, with volatility backed out of the at-the-money straddle.
       Daily uses one trading day (IV ÷ 16); weekly and monthly use the time left until expiry. That's a one-standard-deviation
@@ -126,7 +138,8 @@
   </main>
 
   <footer class="site-footer" id="site-footer"></footer>
-  <script src="assets/js/markets.js?v=20261119f"></script>
-  <script src="assets/js/heatmap.js?v=20261119f"></script>
+  <script src="assets/js/markets.js?v=20261119g"></script>
+  <script src="assets/js/heatmap.js?v=20261119g"></script>
+  <script src="assets/js/market-feeds.js?v=20261119g"></script>
 </body>
 </html>
