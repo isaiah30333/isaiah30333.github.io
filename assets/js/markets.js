@@ -288,7 +288,7 @@
   var LW = window.LightweightCharts;
   var chart = null, candles = null, emLines = [], em = { lo: null, hi: null };
   var ta = null;                                    // technicals: volume + VWAP / EMA 50 / SMA 50 series
-  var TA_COLORS = { vwap: "#7c5cd6", ema: "#2f80ed", sma: "#e08a1e" };
+  var TA_COLORS = { vwap: "#7c5cd6", ema: "#2f80ed", sma: "#e08a1e", bb: "#0d9488" };
   var lastBar = null, chartMode = "", chartKey = "", chartReq = 0, barCache = {};
 
   // interval key -> source candles in the data file, bucket rule, how many candles to show at first
@@ -376,6 +376,17 @@
     }
     return out;
   }
+  // Bollinger Bands (20, 2): 20-bar SMA ± 2 standard deviations (population, like TradingView)
+  function bollinger(data, n, k) {
+    var mid = [], up = [], lo = [];
+    for (var i = n - 1; i < data.length; i++) {
+      var sum = 0, sq = 0;
+      for (var j = i - n + 1; j <= i; j++) { sum += data[j].close; sq += data[j].close * data[j].close; }
+      var m = sum / n, sd = Math.sqrt(Math.max(0, sq / n - m * m)), t = data[i].time;
+      mid.push({ time: t, value: m }); up.push({ time: t, value: m + k * sd }); lo.push({ time: t, value: m - k * sd });
+    }
+    return { mid: mid, up: up, lo: lo };
+  }
   // Intraday: VWAP restarts every session (the standard). Daily / weekly bars: a rolling
   // 20-bar VWAP, since a one-day anchor on a daily chart would just trace each candle.
   function vwap(data, intraday) {
@@ -404,13 +415,20 @@
     return chart.addLineSeries({ color: color, lineWidth: 2, title: title, priceLineVisible: false,
       lastValueVisible: true, crosshairMarkerVisible: false });
   }
+  function band(style, title) {                     // thinner, softer lines so the bands frame the price
+    return chart.addLineSeries({ color: alpha(TA_COLORS.bb, 0.75), lineWidth: 1, lineStyle: style, title: title,
+      priceLineVisible: false, lastValueVisible: !!title, crosshairMarkerVisible: false });
+  }
   function ensureTA() {
     if (ta) return;
     ta = {
       vol: chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false }),
       vwap: line(TA_COLORS.vwap, "VWAP"),
       ema: line(TA_COLORS.ema, "EMA 50"),
-      sma: line(TA_COLORS.sma, "SMA 50")
+      sma: line(TA_COLORS.sma, "SMA 50"),
+      bbUp: band(LW.LineStyle.Solid, "BB upper"),
+      bbMid: band(LW.LineStyle.Dashed, ""),
+      bbLo: band(LW.LineStyle.Solid, "BB lower")
     };
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
   }
@@ -426,13 +444,15 @@
     ta.vwap.setData(hasVol ? vwap(data, intraday) : []);
     ta.ema.setData(ema(data, 50));
     ta.sma.setData(sma(data, 50));
+    var bb = bollinger(data, 20, 2);
+    ta.bbUp.setData(bb.up); ta.bbMid.setData(bb.mid); ta.bbLo.setData(bb.lo);
   }
   function renderLegend(intraday) {
     var el = document.getElementById("chart-legend");
     if (!el) return;
     el.innerHTML = state.view === "technicals"
       ? '<span class="lg ta-vol">▮ Volume</span> <span class="lg ta-vwap">— ' + (intraday ? "VWAP" : "VWAP 20") +
-        '</span> <span class="lg ta-ema">— EMA 50</span> <span class="lg ta-sma">— SMA 50</span>'
+        '</span> <span class="lg ta-ema">— EMA 50</span> <span class="lg ta-sma">— SMA 50</span> <span class="lg ta-bb">— BB 20, 2</span>'
       : '<span class="lg up">- - EM high</span> <span class="lg down">- - EM low</span> <span class="lg">··· center</span>';
   }
 
@@ -486,7 +506,8 @@
       studies: state.view === "technicals" ? [
         { id: "VWAP@tv-basicstudies" },
         { id: "MAExp@tv-basicstudies", inputs: { length: 50 } },
-        { id: "MASimple@tv-basicstudies", inputs: { length: 50 } }
+        { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
+        { id: "BB@tv-basicstudies" }
       ] : []
     });
   }
