@@ -7,12 +7,15 @@
   <meta name="description" content="Daily and weekly expected moves for SPY, QQQ and the largest S&amp;P 500 companies, based on options implied volatility.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/base.css?v=20261118h">
-  <link rel="stylesheet" href="assets/css/pages.css?v=20261118h">
-  <script src="assets/js/config.js?v=20261118h"></script>
-  <script src="assets/js/site.js?v=20261118h"></script>
+  <link rel="stylesheet" href="assets/css/base.css?v=20261118i">
+  <link rel="stylesheet" href="assets/css/pages.css?v=20261118i">
+  <script src="assets/js/config.js?v=20261118i"></script>
+  <script src="assets/js/site.js?v=20261118i"></script>
   <!-- TradingView's open-source charting library: draws the expected-move lines on the chart -->
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- d3 pieces for the S&P 500 heat map: Voronoi cells + squarified sector layout -->
+  <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6.0.4/dist/d3-delaunay.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-hierarchy@3.1.2/dist/d3-hierarchy.min.js"></script>
 </head>
 <body>
   <header class="site-header" id="site-header"></header>
@@ -88,6 +91,19 @@
       </div>
     </div>
 
+    <!-- S&P 500 heat map (shown once data/heatmap.json loads; needs the published site) -->
+    <section class="heat-wrap card" id="heat" aria-label="S&amp;P 500 heat map" hidden>
+      <div class="chart-bar">
+        <div class="chart-title"><strong>S&amp;P 500 heat map</strong> <span class="muted small" id="heat-meta"></span></div>
+        <div class="heat-legend mono small" aria-hidden="true"><span>−3%</span><span class="heat-scale"></span><span>+3%</span></div>
+      </div>
+      <div class="heat-stage" id="heat-stage">
+        <canvas id="heat-canvas" role="img" aria-label="S&amp;P 500 heat map"></canvas>
+        <div class="heat-tip" id="heat-tip" hidden></div>
+      </div>
+      <p class="heat-note muted small">Cell size = weight in the S&amp;P 500, color = today's change. Hover for details; click to open the chart.</p>
+    </section>
+
     <p class="fineprint muted">
       Expected move = price × implied volatility × √time, with volatility backed out of the at-the-money straddle.
       Daily uses one trading day (IV ÷ 16); weekly and monthly use the time left until expiry. That's a one-standard-deviation
@@ -95,11 +111,13 @@
       range is centered on the previous close. <strong>Used</strong> shows how far the live price has traveled toward
       the edge of the range (±100% = at Low/High). Weekly runs through this week's last expiry; monthly runs through the next standard monthly expiry (third Friday). Names without weekly
       options (marked <span class="tag">M</span>) use the next monthly. Ranges refresh every 30 min during market hours.
-      Live prices from Finnhub, options data from Yahoo Finance. Not investment advice.
+      Live prices from Finnhub, options data from Yahoo Finance. Heat map: weights from State Street's daily SPY holdings,
+      sectors from Wikipedia (GICS), prices from Yahoo Finance, refreshed every 30 min during market hours. Not investment advice.
     </p>
   </main>
 
   <footer class="site-footer" id="site-footer"></footer>
-  <script src="assets/js/markets.js?v=20261118h"></script>
+  <script src="assets/js/markets.js?v=20261118i"></script>
+  <script src="assets/js/heatmap.js?v=20261118i"></script>
 </body>
 </html>

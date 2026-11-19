@@ -497,6 +497,13 @@
     if (scroll) document.querySelector(".chart-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  // used by the S&P 500 heat map: chart a stock here if it's in the watchlist
+  window.MarketsSelect = function (sym) {
+    if (!tickers().some(function (t) { return t.symbol === sym && !t.error; })) return false;
+    select(sym, true);
+    return true;
+  };
+
   /* ---------- events ---------- */
   // expected-move horizon: Daily / Weekly / Monthly (table, cards and chart lines)
   document.querySelectorAll("#tf-seg button").forEach(function (b) {

@@ -442,4 +442,27 @@ code { border-bottom-width: 1px; }
 .pbar { display: inline-block; width: 64px; height: 6px; border-radius: 999px; background: var(--bg-subtle); margin-right: 10px; vertical-align: middle; overflow: hidden; }
 .pbar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 
+/* ---------- S&P 500 heat map ---------- */
+.heat-wrap { padding: 0; overflow: hidden; margin-top: 16px; }
+.heat-stage { position: relative; height: clamp(440px, 58vw, 720px); background: #0c0b10; }
+@media (max-width: 700px) { .heat-stage { height: 920px; } }   /* tall on phones so cells stay readable */
+.heat-stage canvas { display: block; touch-action: manipulation; }
+.heat-legend { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+.heat-scale { width: 120px; height: 8px; border-radius: 999px; background: linear-gradient(90deg, rgb(214,58,58), rgb(64,68,82), rgb(34,166,90)); }
+.heat-note { margin: 0; padding: 10px 20px; border-top: 1px solid var(--border); }
+.heat-tip {
+  position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;
+  min-width: 190px; max-width: 240px; padding: 10px 12px;
+  background: rgba(18, 17, 23, .94); color: #f2f3f5;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45);
+  font-size: .8rem; line-height: 1.45;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.heat-tip-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: .95rem; }
+.heat-tip-top .up { color: #5fd18f; } .heat-tip-top .down { color: #f07a7a; }
+.heat-tip-name { color: rgba(255,255,255,.7); margin: 2px 0 6px; }
+.heat-tip-row { display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: .75rem; color: rgba(255,255,255,.8); }
+.heat-tip-row span:first-child { color: rgba(255,255,255,.5); }
+
 .fineprint { font-size: .8rem; margin-top: 20px; max-width: 760px; }

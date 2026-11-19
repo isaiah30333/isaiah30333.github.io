@@ -237,6 +237,137 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     return out
 
 
+# ---------------------------------------------------------------- S&P 500 heat map
+HEATMAP_OUT = ROOT / "data" / "heatmap.json"
+SECTORS_FALLBACK = ROOT / "data" / "sp500-sectors.json"
+SPY_HOLDINGS_URL = ("https://www.ssga.com/us/en/intermediary/library-content/products/"
+                    "fund-data/etfs/us/holdings-daily-us-en-spy.xlsx")
+WIKI_SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+UA = {"User-Agent": "site-data-job/1.0 (GitHub Actions)"}
+
+
+def _get(url: str) -> bytes:
+    import urllib.request
+    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
+        return r.read()
+
+
+def spy_weights() -> tuple[list, str]:
+    """S&P 500 members and index weights from State Street's daily SPY holdings (.xlsx),
+    parsed with the standard library. Returns ([(ticker, name, weight%)], as-of text)."""
+    import io, re, zipfile
+    import xml.etree.ElementTree as ET
+    z = zipfile.ZipFile(io.BytesIO(_get(SPY_HOLDINGS_URL)))
+    m = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    shared = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        shared = ["".join(t.text or "" for t in si.iter(m + "t"))
+                  for si in ET.fromstring(z.read("xl/sharedStrings.xml")).findall(m + "si")]
+    rows = []
+    for r in ET.fromstring(z.read("xl/worksheets/sheet1.xml")).iter(m + "row"):
+        vals = []
+        for c in r.findall(m + "c"):
+            v = c.find(m + "v")
+            s = v.text if v is not None else ""
+            if c.get("t") == "s" and s:
+                s = shared[int(s)]
+            elif c.get("t") == "inlineStr":
+                s = "".join(x.text or "" for x in c.iter(m + "t"))
+            vals.append(s or "")
+        rows.append(vals)
+    as_of = next((r[1] for r in rows[:6] if r and r[0].startswith("Holdings") and len(r) > 1), "")
+    hdr = next(i for i, r in enumerate(rows) if "Ticker" in r and "Weight" in r)
+    H = rows[hdr]
+    ti, ni, wi = H.index("Ticker"), H.index("Name"), H.index("Weight")
+    out = []
+    for r in rows[hdr + 1:]:
+        if len(r) <= wi or not re.match(r"^[A-Z]{1,5}([.\-][A-Z])?$", r[ti] or "") or not re.match(r"^[0-9.]+$", r[wi] or ""):
+            continue
+        out.append((r[ti].replace(".", "-"), r[ni], float(r[wi])))
+    return out, as_of.replace("As of", "").strip()
+
+
+def sp500_sectors() -> dict:
+    """{ticker: {"n": name, "sec": GICS sector}} from Wikipedia; falls back to the saved copy."""
+    from html.parser import HTMLParser
+
+    class Table(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.on, self.depth, self.rows, self.row, self.cell = False, 0, [], None, None
+        def handle_starttag(self, t, a):
+            if t == "table" and dict(a).get("id") == "constituents":
+                self.on, self.depth = True, 0
+            if not self.on:
+                return
+            if t == "table": self.depth += 1
+            if t == "tr": self.row = []
+            if t in ("td", "th") and self.row is not None: self.cell = ""
+        def handle_endtag(self, t):
+            if not self.on:
+                return
+            if t in ("td", "th") and self.cell is not None:
+                self.row.append(self.cell.strip()); self.cell = None
+            if t == "tr" and self.row is not None:
+                self.rows.append(self.row); self.row = None
+            if t == "table":
+                self.depth -= 1
+                if self.depth == 0: self.on = False
+        def handle_data(self, d):
+            if self.cell is not None: self.cell += d
+
+    try:
+        p = Table()
+        p.feed(_get(WIKI_SP500_URL).decode("utf-8"))
+        h = p.rows[0]
+        si, ni, gi = h.index("Symbol"), h.index("Security"), h.index("GICS Sector")
+        m = {r[si].replace(".", "-"): {"n": r[ni], "sec": r[gi]} for r in p.rows[1:] if len(r) > gi}
+        if len(m) > 400:
+            return m
+    except Exception as e:
+        print(f"heatmap: Wikipedia sectors unavailable ({e}); using saved copy", file=sys.stderr)
+    return json.loads(SECTORS_FALLBACK.read_text(encoding="utf-8"))["map"]
+
+
+def build_heatmap(now: dt.datetime) -> None:
+    holdings, weights_as_of = spy_weights()
+    sectors = sp500_sectors()
+    syms = [h[0] for h in holdings]
+    df = yf.download(syms, period="5d", interval="1d", auto_adjust=False, progress=False, threads=True)
+    close = df["Close"]
+    stocks, as_of = [], None
+    for sym, ssga_name, w in holdings:
+        if sym not in close.columns:
+            continue
+        col = close[sym].dropna()
+        if len(col) < 2:
+            continue
+        p, prev = float(col.iloc[-1]), float(col.iloc[-2])
+        if not (p > 0 and prev > 0):
+            continue
+        as_of = max(as_of or col.index[-1], col.index[-1])
+        info = sectors.get(sym) or {}
+        stocks.append({
+            "s": sym,
+            "n": info.get("n") or ssga_name.title(),
+            "sec": info.get("sec") or "Other",
+            "w": round(w, 4),
+            "p": round(p, 2),
+            "c": round(p - prev, 2),
+            "cp": round((p / prev - 1) * 100, 2),
+        })
+    if len(stocks) < 300:
+        raise RuntimeError(f"only {len(stocks)} prices came back")
+    HEATMAP_OUT.write_text(json.dumps({
+        "generatedAt": now.isoformat(timespec="seconds"),
+        "asOf": str(as_of.date()) if hasattr(as_of, "date") else str(as_of),
+        "weightsAsOf": weights_as_of,
+        "source": "Weights: State Street SPY daily holdings. Sectors: Wikipedia (GICS). Prices: Yahoo Finance.",
+        "stocks": stocks,
+    }, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    print(f"heatmap: {len(stocks)} stocks, prices as of {as_of}")
+
+
 # ---------------------------------------------------------------- main
 def main() -> int:
     items = json.loads(WATCHLIST.read_text(encoding="utf-8"))["tickers"]
@@ -281,6 +412,12 @@ def main() -> int:
     OUT_JSON.write_text(text + "\n", encoding="utf-8")
     OUT_JS.write_text("window.EXPECTED_MOVES = " + text + ";\n", encoding="utf-8")
     print(f"Wrote {len(results) - failed}/{len(items)} tickers for session {sess}")
+
+    # S&P 500 heat map: separate, so a problem here never blocks the expected moves
+    try:
+        build_heatmap(now)
+    except Exception as e:
+        print(f"heatmap: skipped ({e})", file=sys.stderr)
     return 0
 
 
