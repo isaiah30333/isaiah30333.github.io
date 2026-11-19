@@ -258,6 +258,7 @@
         var L = live[sym] || (live[sym] = {});
         L.price = tr.p;
         L.ts = tr.t;   // trade time (ms) → which candle it belongs to
+        L.vol = (L.vol || 0) + (tr.v || 0);           // shares traded since the last chart update
       });
       if (feed !== "live") setFeed("live");
       schedulePaint();
@@ -290,6 +291,7 @@
   var ta = null;                                    // technicals: volume + VWAP / EMA 50 / SMA 50 series
   var TA_COLORS = { vwap: "#7c5cd6", ema: "#2f80ed", sma: "#e08a1e", bb: "#0d9488" };
   var lastBar = null, chartMode = "", chartKey = "", chartReq = 0, barCache = {};
+  var liveFull = null, liveIntraday = false;        // the charted candles (with volume), extended by live trades
 
   // interval key -> source candles in the data file, bucket rule, how many candles to show at first
   var IV = {
@@ -387,20 +389,15 @@
     }
     return { mid: mid, up: up, lo: lo };
   }
-  // Intraday: VWAP restarts every session (the standard). Daily / weekly bars: a rolling
-  // 20-bar VWAP, since a one-day anchor on a daily chart would just trace each candle.
+  // VWAP the way TradingView draws it by default (anchor "Session", source hlc3): it restarts
+  // every trading day. On daily / weekly candles each candle is its own anchor period.
   function vwap(data, intraday) {
-    var out = [], pv = 0, vv = 0, day = null, win = [];
+    var out = [], pv = 0, vv = 0, day = null;
     data.forEach(function (b) {
       var tp = (b.high + b.low + b.close) / 3, v = b.volume || 0;
-      if (intraday) {
-        var d = Math.floor(b.time / 86400);
-        if (d !== day) { day = d; pv = 0; vv = 0; }
-        pv += tp * v; vv += v;
-      } else {
-        win.push([tp * v, v]); pv += tp * v; vv += v;
-        if (win.length > 20) { var o = win.shift(); pv -= o[0]; vv -= o[1]; }
-      }
+      var d = intraday ? Math.floor(b.time / 86400) : b.time;
+      if (d !== day) { day = d; pv = 0; vv = 0; }
+      pv += tp * v; vv += v;
       if (vv > 0) out.push({ time: b.time, value: pv / vv });
     });
     return out;
@@ -440,7 +437,6 @@
     var hasVol = data.some(function (b) { return b.volume > 0; });
     var up = alpha(cssVar("--up"), 0.45), down = alpha(cssVar("--down"), 0.45);
     ta.vol.setData(hasVol ? data.map(function (b) { return { time: b.time, value: b.volume, color: b.close >= b.open ? up : down }; }) : []);
-    ta.vwap.applyOptions({ title: intraday ? "VWAP" : "VWAP 20" });
     ta.vwap.setData(hasVol ? vwap(data, intraday) : []);
     ta.ema.setData(ema(data, 50));
     ta.sma.setData(sma(data, 50));
@@ -451,7 +447,7 @@
     var el = document.getElementById("chart-legend");
     if (!el) return;
     el.innerHTML = state.view === "technicals"
-      ? '<span class="lg ta-vol">▮ Volume</span> <span class="lg ta-vwap">— ' + (intraday ? "VWAP" : "VWAP 20") +
+      ? '<span class="lg ta-vol">▮ Volume</span> <span class="lg ta-vwap">— ' + "VWAP" +
         '</span> <span class="lg ta-ema">— EMA 50</span> <span class="lg ta-sma">— SMA 50</span> <span class="lg ta-bb">— BB 20, 2</span>'
       : '<span class="lg up">- - EM high</span> <span class="lg down">- - EM low</span> <span class="lg">··· center</span>';
   }
@@ -558,6 +554,9 @@
     candles.setData(data);
     drawTA(full, !c.day && !c.week);
     lastBar = Object.assign({}, data[data.length - 1]);
+    liveFull = full; liveIntraday = !c.day && !c.week;
+    var L0 = live[t.symbol];
+    if (L0) L0.vol = 0;                               // only count trades after this redraw
 
     if (b.high != null) {
       var h = HORIZON[state.tf];
@@ -585,6 +584,16 @@
       lastBar.close = L.price;
     }
     candles.update(Object.assign({}, lastBar));
+    // the same candle in the full series, plus the volume traded since the last update,
+    // then redraw volume and the indicators so they move with the price
+    if (liveFull) {
+      var f = liveFull[liveFull.length - 1];
+      if (!f || f.time !== lastBar.time) { f = { time: lastBar.time, volume: 0 }; liveFull.push(f); }
+      f.open = lastBar.open; f.high = lastBar.high; f.low = lastBar.low; f.close = lastBar.close;
+      f.volume = (f.volume || 0) + (L.vol || 0);
+      L.vol = 0;
+      drawTA(liveFull, liveIntraday);
+    }
   }
 
 
