@@ -4,7 +4,7 @@
   var esc = window.SiteUtil.esc;
   var root = document.documentElement;
   // tf = expected-move horizon (daily | weekly | monthly); iv = chart candle interval
-  var state = { tf: "daily", iv: "15m", sort: null, dir: 1, data: null, symbol: null };
+  var state = { tf: "daily", iv: "15m", sort: null, dir: 1, data: null, symbol: null, extra: null };
   var live = {};          // yahoo symbol -> { price, pc }
   var fhToSym = {};       // finnhub symbol -> yahoo symbol
   var feed = "off";       // off | connecting | live | closed | error
@@ -404,7 +404,7 @@
   }
 
   function renderChart() {
-    var t = tickers().filter(function (x) { return x.symbol === state.symbol; })[0];
+    var t = chartTicker();
     if (!t) return;
     var theme = isDark() ? "dark" : "light";
     var key = [t.symbol, state.tf, state.iv, theme, state.data.generatedAt].join("|");
@@ -420,7 +420,7 @@
       ? '<span class="muted">' + label + " EM</span> ±" + money(b.move) +
         ' <span class="muted">(' + pct(b.movePct) + ')</span> · <span class="down">' + money(b.low) +
         '</span> – <span class="up">' + money(b.high) + '</span> <span class="muted">· exp ' + esc(fmtDate(b.expiry)) + "</span>"
-      : "";
+      : (t.extra ? '<span class="muted">Chart only · expected moves cover the watchlist</span>' : "");
 
     var my = ++chartReq;
     loadBars(t.symbol).then(function (bars) {
@@ -497,12 +497,100 @@
     if (scroll) document.querySelector(".chart-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // used by the S&P 500 heat map: chart a stock here if it's in the watchlist
-  window.MarketsSelect = function (sym) {
-    if (!tickers().some(function (t) { return t.symbol === sym && !t.error; })) return false;
+  // the ticker being charted: a watchlist name, or anything picked from search / the heat map
+  function chartTicker() {
+    var t = tickers().filter(function (x) { return x.symbol === state.symbol; })[0];
+    if (t) return t;
+    return state.extra && state.extra.symbol === state.symbol ? state.extra : null;
+  }
+
+  // Chart any symbol. Watchlist names keep candles + expected-move lines;
+  // everything else charts through TradingView. Used by search and the heat map.
+  window.MarketsSelect = function (sym, name) {
+    if (tickers().some(function (t) { return t.symbol === sym && !t.error; })) { state.extra = null; select(sym, true); return true; }
+    var u = universeBySym[sym];
+    state.extra = { symbol: sym, name: name || (u && u.n) || sym, tv: sym.replace("-", "."), extra: true };
     select(sym, true);
     return true;
   };
+
+  /* ---------- ticker search: S&P 500 + major ETFs + the watchlist ---------- */
+  var ETFS = [
+    ["SPY", "SPDR S&P 500 ETF"], ["QQQ", "Invesco QQQ (Nasdaq-100)"], ["DIA", "SPDR Dow Jones Industrial Average ETF"],
+    ["IWM", "iShares Russell 2000 ETF"], ["VOO", "Vanguard S&P 500 ETF"], ["VTI", "Vanguard Total Stock Market ETF"],
+    ["XLK", "Technology Select Sector SPDR"], ["XLF", "Financial Select Sector SPDR"], ["XLE", "Energy Select Sector SPDR"],
+    ["XLV", "Health Care Select Sector SPDR"], ["XLY", "Consumer Discretionary Select Sector SPDR"], ["XLP", "Consumer Staples Select Sector SPDR"],
+    ["XLI", "Industrial Select Sector SPDR"], ["XLU", "Utilities Select Sector SPDR"], ["XLB", "Materials Select Sector SPDR"],
+    ["XLRE", "Real Estate Select Sector SPDR"], ["XLC", "Communication Services Select Sector SPDR"], ["SMH", "VanEck Semiconductor ETF"],
+    ["GLD", "SPDR Gold Shares"], ["SLV", "iShares Silver Trust"], ["TLT", "iShares 20+ Year Treasury Bond ETF"], ["HYG", "iShares High Yield Corporate Bond ETF"]
+  ];
+  var universe = [], universeBySym = {};
+  function addU(s, n, em) {
+    if (universeBySym[s]) { if (em) universeBySym[s].em = true; return; }
+    var u = { s: s, n: n, em: !!em };
+    universe.push(u); universeBySym[s] = u;
+  }
+  function buildUniverse() {
+    tickers().forEach(function (t) { addU(t.symbol, t.name || t.symbol, true); });
+    ETFS.forEach(function (e) { addU(e[0], e[1]); });
+    if (location.protocol.indexOf("http") !== 0) return;
+    fetch("data/sp500-sectors.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (d && d.map) Object.keys(d.map).forEach(function (s) { addU(s, d.map[s].n); });
+    }).catch(function () {});
+  }
+
+  function searchU(q) {
+    q = q.trim().toUpperCase();
+    if (!q) return [];
+    var starts = [], names = [];
+    universe.forEach(function (u) {
+      if (u.s.indexOf(q) === 0) starts.push(u);
+      else if (q.length > 1 && u.n.toUpperCase().indexOf(q) > -1) names.push(u);
+    });
+    starts.sort(function (a, b) { return a.s.length - b.s.length || a.s.localeCompare(b.s); });
+    return starts.concat(names).slice(0, 8);
+  }
+
+  (function wireSearch() {
+    var input = document.getElementById("tsearch-input"), list = document.getElementById("tsearch-list");
+    if (!input || !list) return;
+    var hits = [], active = -1;
+    function close() {
+      list.hidden = true; input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant"); active = -1;
+    }
+    function paint() {
+      if (!hits.length) {
+        var typed = !!input.value.trim();
+        list.innerHTML = typed ? '<li class="tsearch-empty">No match in the S&amp;P 500 or major ETFs</li>' : "";
+        list.hidden = !typed; input.setAttribute("aria-expanded", typed ? "true" : "false");
+        return;
+      }
+      list.innerHTML = hits.map(function (u, i) {
+        return '<li role="option" id="ts-' + i + '" data-sym="' + esc(u.s) + '" aria-selected="' + (i === active) + '">' +
+          '<span class="ts-sym">' + esc(u.s) + '</span><span class="ts-name">' + esc(u.n) + "</span>" +
+          (u.em ? '<span class="ts-em" title="Has expected-move lines">EM</span>' : "") + "</li>";
+      }).join("");
+      list.hidden = false; input.setAttribute("aria-expanded", "true");
+      if (active > -1) input.setAttribute("aria-activedescendant", "ts-" + active);
+      else input.removeAttribute("aria-activedescendant");
+    }
+    function pick(u) { if (!u) return; input.value = ""; close(); input.blur(); window.MarketsSelect(u.s, u.n); }
+    input.addEventListener("input", function () { hits = searchU(input.value); active = hits.length ? 0 : -1; paint(); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown" && hits.length) { active = (active + 1) % hits.length; paint(); e.preventDefault(); }
+      else if (e.key === "ArrowUp" && hits.length) { active = (active - 1 + hits.length) % hits.length; paint(); e.preventDefault(); }
+      else if (e.key === "Enter") { pick(hits[active > -1 ? active : 0]); e.preventDefault(); }
+      else if (e.key === "Escape") { input.value = ""; close(); }
+    });
+    input.addEventListener("blur", function () { setTimeout(close, 120); });
+    list.addEventListener("mousedown", function (e) {          // mousedown beats the input's blur
+      var li = e.target.closest("[data-sym]");
+      if (!li) return;
+      e.preventDefault();
+      pick(universeBySym[li.getAttribute("data-sym")]);
+    });
+  })();
 
   /* ---------- events ---------- */
   // expected-move horizon: Daily / Weekly / Monthly (table, cards and chart lines)
@@ -575,6 +663,7 @@
     }
     state.data = d;
     state.symbol = (d.tickers[0] || {}).symbol;
+    buildUniverse();
     renderMeta();
     render();
     renderChart();

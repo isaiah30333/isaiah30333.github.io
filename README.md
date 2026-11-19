@@ -5,15 +5,18 @@ It has one shared header and footer, and **one config file** controls the name, 
 
 ```
 site-base/
-├─ index.html            Home: hero, about, projects, contact (LinkedIn + Gmail)
+├─ index.html            Home layout (the words come from content.js)
 ├─ markets.html          Expected moves (daily/weekly) + TradingView chart
 ├─ launchpad.html        Quick tiles: Claude, Gemini, AI Studio, NotebookLM, Antigravity, Obsidian
 ├─ assets/
-│  ├─ js/config.js       ← EDIT THIS: name, email, LinkedIn, nav, colors, fonts, launchpad tiles
+│  ├─ js/config.js       ← EDIT THIS: settings (name, email, LinkedIn, nav, colors, fonts, photo, launchpad tiles)
+│  ├─ js/content.js      ← EDIT THIS: the words on the Home page (hero line, quick facts, About and Work cards)
+│  ├─ js/home.js         builds the Home page from content.js
 │  ├─ js/site.js         renders the shared header/footer, theme, light/dark toggle
 │  ├─ js/markets.js      markets page logic
 │  ├─ css/base.css       design system: tokens, header, buttons, cards, footer
-│  └─ css/pages.css      page-specific sections
+│  ├─ css/pages.css      page-specific sections
+│  └─ css/drawer.css     the rounded sheet that rises over the heading photo
 ├─ data/
 │  ├─ watchlist.json     ← tickers for the Markets page
 │  ├─ expected-moves.json  generated (sample data until the first run)
@@ -26,7 +29,7 @@ site-base/
 ## 1. Make it yours (2 minutes)
 
 Open `assets/js/config.js` and set `name`, `monogram`, `email`, `linkedin`, and `theme.accent`.
-Then edit the text in `index.html` (hero line, quick facts, about, project cards).
+Then edit the words in `assets/js/content.js` (hero line, quick facts, About and Work cards). Wrap words in `**double asterisks**` to bold them.
 
 ## 2. Turn on automatic market data (one-time, free)
 

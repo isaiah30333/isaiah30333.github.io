@@ -7,23 +7,23 @@
   <meta name="description" content="Isaiah Cordova · CSU Finance">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/base.css?v=20261118o">
-  <link rel="stylesheet" href="assets/css/pages.css?v=20261118o">
-  <script src="assets/js/config.js?v=20261118o"></script>
-  <script src="assets/js/site.js?v=20261118o"></script>
+  <link rel="stylesheet" href="assets/css/base.css?v=20261119a">
+  <link rel="stylesheet" href="assets/css/pages.css?v=20261119a">
+  <link rel="stylesheet" href="assets/css/drawer.css?v=20261119a">
+  <script src="assets/js/config.js?v=20261119a"></script>
+  <script src="assets/js/site.js?v=20261119a"></script>
+  <!-- the words on this page live in content.js -->
+  <script src="assets/js/content.js?v=20261119a"></script>
 </head>
 <body>
   <header class="site-header" id="site-header"></header>
 
   <main>
-    <!-- HERO -->
+    <!-- HERO (text comes from content.js; name and tagline from config.js) -->
     <section class="hero container">
       <p class="eyebrow reveal"><span data-site="tagline"></span></p>
       <h1 class="reveal" style="--d:.05s"><span data-site="name"></span></h1>
-      <p class="lead reveal" style="--d:.1s">
-        Finance student at Colorado State University, concentrating in Investment Analysis.
-        I cover consumer staples for CSU's Pioneer Student Investment Fund and have traded index options on my own account since 2021.
-      </p>
+      <p class="lead reveal" style="--d:.1s" id="hero-lead"></p>
       <div class="cta-row reveal" style="--d:.15s">
         <a class="btn" data-site-href="linkedin" href="#" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10v7M8 7v.01M12 17v-4a2 2 0 0 1 4 0v4M12 10v7"/></svg>
@@ -36,146 +36,49 @@
       </div>
     </section>
 
-    <!-- QUICK FACTS -->
-    <section class="container">
-      <div class="facts reveal">
-        <div><span class="fact-k">Education</span><span class="fact-v">CSU Finance (Dec '26)</span></div>
-        <div><span class="fact-k">Focus</span><span class="fact-v">Investment Analysis</span></div>
-        <div><span class="fact-k">Based in</span><span class="fact-v">Denver, Colorado</span></div>
-        <div><span class="fact-k">Open to</span><span class="fact-v">Analyst &amp; Trading Roles</span></div>
-      </div>
-    </section>
+    <!-- everything below the hero rides up over the photo on one rounded sheet -->
+    <div class="sheet">
+      <section class="container">
+        <div class="facts reveal" id="facts"></div>
+      </section>
 
-    <!-- ABOUT: grouped highlights. Each card is a heading + bullet list; edit the bullets directly. -->
-    <section class="section" id="about">
-      <div class="container">
-        <div class="section-head reveal">
-          <p class="eyebrow">About</p>
-          <h2>About me</h2>
+      <section class="section" id="about">
+        <div class="container">
+          <div class="section-head reveal" id="about-head"></div>
+          <div class="about-grid" id="about-grid"></div>
         </div>
-        <div class="about-grid">
-          <article class="about-card reveal">
-            <h3 class="about-k">Education</h3>
-            <ul class="about-list">
-              <li><strong>B.S. Business Finance</strong>, Colorado State University</li>
-              <li>Concentration in Investment Analysis</li>
-              <li>Graduating December 2026</li>
-              <li>Next: CFA program, then the CMT</li>
-            </ul>
-          </article>
-          <article class="about-card about-wide reveal" style="--d:.05s">
-            <h3 class="about-k">Pioneer Student Investment Fund</h3>
-            <ul class="about-list">
-              <li><strong>Consumer staples analyst</strong> on a ~$600K student-run portfolio benchmarked to the S&amp;P 500</li>
-              <li>Pitched <strong>Unilever</strong>; helped build the team's <strong>Monster Beverage</strong> pitch (DCF, comps, growth projections)</li>
-              <li>Presented portfolio performance and Bloomberg attribution at the Fall 2026 market update</li>
-              <li><strong>Recruitment Committee:</strong> gave the recruiting presentation to 200+ students</li>
-            </ul>
-          </article>
-          <article class="about-card reveal">
-            <h3 class="about-k">Valuation</h3>
-            <ul class="about-list">
-              <li>Johnson &amp; Johnson group valuation, Enterprise Valuation class</li>
-              <li>Built the peer regression: forward P/E vs. revenue growth and EBITDA margin, 14 pharma and MedTech peers</li>
-            </ul>
-          </article>
-          <article class="about-card reveal" style="--d:.05s">
-            <h3 class="about-k">Markets</h3>
-            <ul class="about-list">
-              <li>Trading SPX and SPY options on my own account since 2021</li>
-              <li>Built the Expected Moves tool on this site</li>
-            </ul>
-          </article>
-          <article class="about-card reveal" style="--d:.1s">
-            <h3 class="about-k">Experience</h3>
-            <ul class="about-list">
-              <li>Walking Stick Golf Course, Pueblo: golf shop and cart barn</li>
-              <li>Handled check-ins and the register for 50+ customers a day</li>
-            </ul>
-          </article>
-          <article class="about-card about-full reveal">
-            <h3 class="about-k">Skills &amp; tools</h3>
-            <ul class="chips">
-              <li>DCF valuation</li>
-              <li>Comparable multiples</li>
-              <li>Options &amp; implied volatility</li>
-              <li>Bloomberg Terminal</li>
-              <li>TradingView</li>
-              <li>Excel</li>
-            </ul>
-          </article>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- PROJECTS / WORK -->
-    <section class="section" id="work">
-      <div class="container">
-        <div class="section-head reveal">
-          <p class="eyebrow">Work</p>
-          <h2>Projects &amp; experience</h2>
+      <section class="section" id="work">
+        <div class="container">
+          <div class="section-head reveal" id="work-head"></div>
+          <div class="grid grid-2" id="work-grid"></div>
         </div>
-        <div class="grid grid-2">
-          <div class="card project reveal span-full">
-            <span class="tag">Student-Managed Fund</span>
-            <h3>Pioneer Student Investment Fund</h3>
-            <p class="muted">Consumer staples analyst on a ~$600K student-run fund. Pitched Unilever and helped build the Monster Beverage pitch.</p>
-            <span class="card-link">Colorado State University · Fall 2026</span>
-          </div>
-          <div class="card project reveal" style="--d:.05s">
-            <span class="tag">Enterprise Valuation</span>
-            <h3>Johnson &amp; Johnson Valuation</h3>
-            <p class="muted">Built the peer regression behind our group's valuation.</p>
-            <span class="card-link">Enterprise Valuation · Fall 2026</span>
-          </div>
-          <a class="card project reveal" href="markets.html" style="--d:.1s">
-            <span class="tag">Live Tool</span>
-            <h3>Expected Moves</h3>
-            <p class="muted">Live daily, weekly and monthly ranges priced from options.</p>
-            <span class="card-link">Open live tool →</span>
-          </a>
-          <div class="card project reveal" style="--d:.15s">
-            <span class="tag">Personal Trading</span>
-            <h3>Index Options</h3>
-            <p class="muted">SPX and SPY options on my own account.</p>
-            <span class="card-link">July 2021 – Present</span>
-          </div>
-          <div class="card project reveal" style="--d:.2s">
-            <span class="tag">Equity Research</span>
-            <h3>CSU Finance Club</h3>
-            <p class="muted">Stock valuations with fellow members using DCF and multiples.</p>
-            <span class="card-link">Sept 2024 – Present</span>
-          </div>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- CONTACT -->
-    <section class="section" id="contact">
-      <div class="container">
-        <div class="contact-card reveal">
-          <div>
-            <p class="eyebrow">Contact</p>
-            <h2>Let's talk.</h2>
-            <p class="muted">The fastest way to reach me is email or LinkedIn.</p>
-          </div>
-          <div class="contact-links">
-            <a class="contact-row" data-gmail-compose href="#" target="_blank" rel="noopener">
-              <span class="contact-k">Email</span>
-              <span class="contact-v" data-site="email"></span>
-              <span aria-hidden="true">↗</span>
-            </a>
-            <a class="contact-row" data-site-href="linkedin" href="#" target="_blank" rel="noopener">
-              <span class="contact-k">LinkedIn</span>
-              <span class="contact-v">View profile</span>
-              <span aria-hidden="true">↗</span>
-            </a>
+      <section class="section" id="contact">
+        <div class="container">
+          <div class="contact-card reveal">
+            <div id="contact-head"></div>
+            <div class="contact-links">
+              <a class="contact-row" data-gmail-compose href="#" target="_blank" rel="noopener">
+                <span class="contact-k">Email</span>
+                <span class="contact-v" data-site="email"></span>
+                <span aria-hidden="true">↗</span>
+              </a>
+              <a class="contact-row" data-site-href="linkedin" href="#" target="_blank" rel="noopener">
+                <span class="contact-k">LinkedIn</span>
+                <span class="contact-v">View profile</span>
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </main>
 
   <footer class="site-footer" id="site-footer"></footer>
+  <script src="assets/js/home.js?v=20261119a"></script>
 </body>
 </html>
