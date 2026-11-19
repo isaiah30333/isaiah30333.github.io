@@ -181,11 +181,58 @@
     items.forEach(function (i) { io.observe(i); });
   }
 
+  /* ---------- gibberish decode on hover ----------
+     Hovering a tile/card scrambles its small monospace label into random characters,
+     then decodes it left to right (~0.45s). Monospace keeps the width steady.
+     Add data-scramble to any element to opt it in; tiles below are wired by default. */
+  var GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$%#&@";
+  var reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function scramble(el) {
+    if (reduceMotion || !el) return;
+    var text = el.getAttribute("data-text");
+    if (text == null) { text = el.textContent; el.setAttribute("data-text", text); el.setAttribute("aria-label", text); }
+    if (el._raf) cancelAnimationFrame(el._raf);
+    var dur = 450, start = performance.now(), last = 0, out = text;
+    function frame(now) {
+      var p = Math.min(1, (now - start) / dur);
+      if (now - last > 35 || p === 1) {                 // re-roll glyphs ~28×/s: crisp, not a blur
+        last = now;
+        var done = Math.floor(p * text.length);
+        out = "";
+        for (var i = 0; i < text.length; i++) {
+          var c = text[i];
+          if (i < done || !/[A-Za-z0-9]/.test(c)) { out += c; continue; }
+          var g = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+          out += c === c.toLowerCase() && c !== c.toUpperCase() ? g.toLowerCase() : g;   // keep each letter's case
+        }
+        el.textContent = out;
+      }
+      if (p < 1) el._raf = requestAnimationFrame(frame);
+      else { el.textContent = text; el._raf = null; }
+    }
+    el._raf = requestAnimationFrame(frame);
+  }
+
+  function wireScramble() {
+    // [tile, label inside it]
+    var pairs = [[".facts > div", ".fact-k"], [".card.project", ".tag"], ["[data-scramble-host]", "[data-scramble]"]];
+    pairs.forEach(function (p) {
+      document.querySelectorAll(p[0]).forEach(function (host) {
+        var label = host.querySelector(p[1]);
+        if (!label) return;
+        host.addEventListener("mouseenter", function () { scramble(label); });
+        host.addEventListener("focusin", function () { scramble(label); });
+      });
+    });
+  }
+
   function init() {
     renderHeader();
     renderFooter();
     fillPlaceholders();
     reveal();
+    wireScramble();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
