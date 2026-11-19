@@ -29,6 +29,11 @@ window.SITE = {
     radius: "12px",             // corner roundness: "4px" sharp … "20px" soft
     defaultMode: "system"       // "system" | "light" | "dark"
   },
+  // Photo behind the heading area of every page. Set to null to turn it off.
+  heroImage: "assets/img/denver-skyline.jpg",
+  // Free under the Unsplash License (no credit required, but it's courteous). Shown small in the footer.
+  heroCredit: { text: "Photo: Ryan De Hamer / Unsplash", url: "https://unsplash.com/photos/A4RpHR83luM" },
+
   fonts: {
     // Any Google Fonts family names
     heading: "Inter Tight",

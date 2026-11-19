@@ -298,6 +298,8 @@ a.card:hover, .card.hover:hover { border-color: var(--border-strong); box-shadow
 .footer-inner p { margin: 0; }
 .footer-links { display: flex; gap: 20px; }
 .footer-links a:hover { color: var(--text); }
+.photo-credit { color: var(--text-faint); font-size: .8rem; }
+.photo-credit:hover { color: var(--text); }
 
 /* ---------- motion ---------- */
 .reveal { opacity: 0; transform: translateY(12px); transition: opacity .6s ease, transform .6s ease; transition-delay: var(--d, 0s); }

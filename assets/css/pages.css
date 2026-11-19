@@ -101,6 +101,49 @@ code { border-bottom-width: 1px; }
   pointer-events: none;
 }
 .page-head::before { width: min(420px, 70vw); top: -160px; opacity: .8; }
+
+/* ---------- heading photo band (on when config.heroImage is set) ----------
+   Full-width photo behind each page's heading, with a dark fade on the left for
+   legible white text. On Home it ends at the quick-facts tiles, which overlap its
+   bottom edge by --hero-overlap. */
+:root { --hero-overlap: 44px; --hero-scrim: linear-gradient(90deg, rgba(8,10,18,.84) 0%, rgba(8,10,18,.68) 45%, rgba(8,10,18,.30) 75%, rgba(8,10,18,.12) 100%); }
+:root.has-hero-img :is(.hero, .page-head) :is(h1, .lead, .muted) { text-shadow: 0 1px 12px rgba(0,0,0,.45); }
+:root.has-hero-img .hero::before,
+:root.has-hero-img .page-head::before {
+  top: 0; bottom: 0; left: 50%; right: auto;
+  width: 100vw; aspect-ratio: auto;
+  transform: translateX(-50%);
+  border-radius: 0; filter: none; opacity: 1;
+  background: var(--hero-scrim), var(--hero-img) center var(--hero-y, 88%) / cover no-repeat;
+}
+/* the skyline sits in the lower part of the photo under a dark sky; thinner bands crop to it */
+:root.has-hero-img .page-head::before { --hero-y: 84%; }
+:root.has-hero-img .hero { padding-top: clamp(64px, 10vw, 120px); padding-bottom: calc(var(--hero-overlap) + 56px); }
+:root.has-hero-img .hero::before { bottom: 0; }
+:root.has-hero-img .hero + .container .facts { margin-top: calc(-1 * var(--hero-overlap)); position: relative; z-index: 1; }
+:root.has-hero-img .facts > div { box-shadow: var(--shadow-lg); }
+
+/* inner pages: band reaches up to the header and a little past the heading */
+:root.has-hero-img .page-head { padding-bottom: 36px; margin-bottom: 28px; }
+:root.has-hero-img .page-head::before { top: calc(-1 * clamp(40px, 7vw, 72px)); }
+
+/* text and controls on the photo */
+:root.has-hero-img :is(.hero, .page-head) { color: #fff; }
+:root.has-hero-img :is(.hero, .page-head) .eyebrow { color: #E8C36A; }
+:root.has-hero-img :is(.hero, .page-head) :is(.lead, .muted) { color: rgba(255,255,255,.82); }
+:root.has-hero-img :is(.hero, .page-head) strong { color: #fff; }
+:root.has-hero-img .hero .btn-ghost { color: #fff; border-color: rgba(255,255,255,.45); background: rgba(255,255,255,.06); }
+:root.has-hero-img .hero .btn-ghost:hover { background: rgba(255,255,255,.14); border-color: #fff; }
+:root.has-hero-img .page-head :is(.seg, .live-pill) {
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.28);
+  color: rgba(255,255,255,.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+:root.has-hero-img .page-head .seg button { color: rgba(255,255,255,.85); }
+:root.has-hero-img .page-head .seg button[aria-selected="true"] { background: #fff; color: #5a4512; }
+:root.has-hero-img .page-head :is(kbd, code) { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
 .facts > div:hover .fact-k { color: var(--accent); }
 .facts > div:hover .fact-v { color: var(--accent); font-weight: 600; }
 @media (max-width: 760px) {

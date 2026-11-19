@@ -21,6 +21,13 @@
   if (t.accentDark) root.style.setProperty("--accent-dark", t.accentDark);
   if (t.radius) root.style.setProperty("--radius", t.radius);
 
+  /* ---------- heading photo (config.heroImage) ---------- */
+  // Absolute URL so the CSS variable resolves the same from every page.
+  if (S.heroImage) {
+    root.classList.add("has-hero-img");
+    root.style.setProperty("--hero-img", 'url("' + new URL(S.heroImage, document.baseURI).href + '")');
+  }
+
   var mode = store("site-mode") || t.defaultMode || "system";
   function applyMode(m) {
     if (m === "light" || m === "dark") root.setAttribute("data-theme", m);
@@ -118,9 +125,12 @@
     var social = "";
     if (S.linkedin) social += '<a href="' + esc(S.linkedin) + '" target="_blank" rel="noopener">LinkedIn</a>';
     if (S.email) social += '<a href="mailto:' + esc(S.email) + '">Email</a>';
+    var credit = S.heroImage && S.heroCredit
+      ? ' · <a class="photo-credit" href="' + esc(S.heroCredit.url) + '" target="_blank" rel="noopener">' + esc(S.heroCredit.text) + "</a>"
+      : "";
     el.innerHTML =
       '<div class="footer-inner container">' +
-        "<p>© " + year + " " + esc(S.name || "") + (S.footerNote ? " · " + esc(S.footerNote) : "") + "</p>" +
+        "<p>© " + year + " " + esc(S.name || "") + (S.footerNote ? " · " + esc(S.footerNote) : "") + credit + "</p>" +
         '<div class="footer-links">' + social + "</div>" +
       "</div>";
   }
