@@ -26,8 +26,9 @@
 
   var BG = "#0c0b10";
   var LABEL_H = 18;          // sector label strip
-  var GAP = 3;               // space between sectors
-  var INSET = 0.94;          // resting gap between cells
+  var GAP = 2;               // space between sectors
+  var SEAM = "rgba(12,11,16,.22)";   // faint line where neighboring cells meet (no black gaps)
+  var SWELL = 0.04;          // hovered cell grows this much over its neighbors
   var SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
 
   // wake physics
@@ -148,7 +149,7 @@
   }
 
   function cellPath(g, c, now, moving) {
-    var k = INSET + (1 - INSET) * c.glow;            // gaps close as a cell lights up
+    var k = c === hover ? 1 + SWELL * c.glow : 1;    // cells meet edge to edge; the hovered one swells
     var off = moving ? wake(c.cx, c.cy, now) : [0, 0];
     var ccx = c.cx + off[0], ccy = c.cy + off[1];
     g.beginPath();
@@ -166,7 +167,9 @@
     var center = cellPath(g, c, now, moving);
     g.fillStyle = rgb(c.color, 0.22 * c.glow);
     g.fill();
-    if (c === hover) { g.lineWidth = 1.5; g.strokeStyle = "rgba(255,255,255,.85)"; g.stroke(); }
+    if (c === hover) { g.lineWidth = 1.5; g.strokeStyle = "rgba(255,255,255,.85)"; }
+    else { g.lineWidth = 1; g.strokeStyle = SEAM; }
+    g.stroke();
     if (!c.label) return;
     g.save();
     g.clip();
