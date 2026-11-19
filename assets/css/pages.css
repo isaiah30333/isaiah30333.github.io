@@ -44,7 +44,8 @@ code { border-bottom-width: 1px; }
 .fact-k { font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); transition: color .2s ease; }
 .fact-v { font-weight: 500; transition: color .2s ease; }
 .facts > div:hover,
-.card.project:hover {
+.card.project:hover,
+.about-card:hover {
   transform: translateY(-4px) scale(1.02);
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent), var(--shadow-lg);   /* 2px outline without layout shift */
@@ -52,9 +53,10 @@ code { border-bottom-width: 1px; }
 }
 
 /* ---------- glow highlight (same effect as the Launchpad tiles) ----------
-   A soft navy→sky light blob fades in from the bottom-right corner on hover. */
+   A soft bronze→gold light blob fades in from the bottom-right corner on hover. */
 .facts > div,
 .card.project,
+.about-card,
 .contact-row,
 .pin-card {
   position: relative;
@@ -63,13 +65,14 @@ code { border-bottom-width: 1px; }
 }
 .facts > div::after,
 .card.project::after,
+.about-card::after,
 .contact-row::after,
 .pin-card::after {
   content: "";
   position: absolute;
   right: -25%;
   bottom: -60%;
-  width: 75%;
+  width: 65%;
   aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(circle at 40% 40%, var(--glow-2), var(--glow-1) 55%, transparent 72%);
@@ -81,9 +84,15 @@ code { border-bottom-width: 1px; }
 }
 .facts > div:hover::after,
 .card.project:hover::after,
+.about-card:hover::after,
 .contact-row:hover::after,
 .pin-card:hover::after { opacity: var(--glow-strength); }
-.card.project.span-full::after { width: 40%; right: -10%; }
+.card.project.span-full::after,
+.about-wide::after,
+.about-full::after { width: 34%; right: -8%; }
+/* wide cards: gentler scale so they don't overhang */
+.about-wide:hover, .about-full:hover { transform: translateY(-4px) scale(1.01); }
+.about-card:hover .about-list li { color: var(--text); }
 
 /* faint navy wash behind the hero and inner-page headings */
 .hero, .page-head { position: relative; isolation: isolate; }

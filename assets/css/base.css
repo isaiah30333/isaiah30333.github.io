@@ -21,7 +21,7 @@
   /* hover glow (the Launchpad-style highlight used site-wide): bronze → gold */
   --glow-1: #8A6A1F;
   --glow-2: #E8C36A;
-  --glow-strength: .18;
+  --glow-strength: .11;
   --hover-fill: color-mix(in srgb, var(--accent) 4%, var(--surface));
   --text: #0b0b0f;
   --text-muted: #5c5c66;
@@ -58,7 +58,7 @@
     --border-strong: #3a352a;
     --glow-1: #B8892E;
     --glow-2: #F0D08A;
-    --glow-strength: .2;
+    --glow-strength: .12;
     --hover-fill: color-mix(in srgb, var(--accent) 6%, var(--surface));
     --text: #f4f4f6;
     --text-muted: #a1a1ab;
@@ -80,7 +80,7 @@
   --border-strong: #3a352a;
   --glow-1: #B8892E;
   --glow-2: #F0D08A;
-  --glow-strength: .2;
+  --glow-strength: .12;
   --hover-fill: color-mix(in srgb, var(--accent) 6%, var(--surface));
   --text: #f4f4f6;
   --text-muted: #a1a1ab;
