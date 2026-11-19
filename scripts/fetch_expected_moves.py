@@ -168,9 +168,19 @@ def analyze(item: dict, sess: dt.date, now: dt.datetime) -> dict:
     out = {"symbol": sym, "tv": item.get("tv", sym), "name": item.get("name", sym), "pin": bool(item.get("pin"))}
     tk = yf.Ticker(sym)
 
-    fi = tk.fast_info
-    price = _num(getattr(fi, "last_price", None))
-    prev = _num(getattr(fi, "previous_close", None))
+    # Price and previous close from the same daily history (as the heat map does).
+    # fast_info.previous_close can return the close from two sessions back after hours.
+    price = prev = 0.0
+    try:
+        closes = tk.history(period="5d", interval="1d", auto_adjust=False)["Close"].dropna()
+        if len(closes) >= 2:
+            price, prev = _num(closes.iloc[-1]), _num(closes.iloc[-2])
+    except Exception:
+        pass
+    if price <= 0:
+        fi = tk.fast_info
+        price = _num(getattr(fi, "last_price", None))
+        prev = _num(getattr(fi, "previous_close", None))
     if price <= 0:
         raise ValueError("no price")
     out["price"] = round(price, 4 if price < 5 else 2)
